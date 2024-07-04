@@ -20,6 +20,7 @@
 #include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QRegularExpression>
 #include <QDebug>
 
 Q_DECLARE_LOGGING_CATEGORY(logAppFileManager)
@@ -255,9 +256,9 @@ void CommandParser::openInHomeDirectory()
 {
     QString homePath = StandardPaths::location(StandardPaths::StandardLocation::kHomePath);
     QUrl url = QUrl::fromUserInput(homePath);
-    auto flag = !DConfigManager::instance()->
-            value(kViewDConfName,
-                  kOpenFolderWindowsInASeparateProcess, false).toBool();
+    auto flag = !DConfigManager::instance()->value(kViewDConfName,
+                                                   kOpenFolderWindowsInASeparateProcess, false)
+                         .toBool();
     dpfSignalDispatcher->publish(GlobalEventType::kOpenNewWindow, url, flag);
 }
 
@@ -269,7 +270,7 @@ void CommandParser::openInUrls()
             //路径字符串在DUrl::fromUserInput中会处理编码，这里不处理
             if (!QDir().exists(path) && !path.startsWith("./") && !path.startsWith("../") && !path.startsWith("/")) {
                 // 路径中包含特殊字符的全部uri编码
-                QRegExp regexp("[#&@\\!\\?]");
+                QRegularExpression regexp("[#&@\\!\\?]");
                 if (path.contains(regexp)) {
                     QString left, right, encode;
                     int idx = path.indexOf(regexp);
@@ -298,9 +299,9 @@ void CommandParser::openInUrls()
         argumentUrls.append(url);
     }
     if (argumentUrls.isEmpty()) {
-        auto flag = !DConfigManager::instance()->
-                value(kViewDConfName,
-                      kOpenFolderWindowsInASeparateProcess, false).toBool();
+        auto flag = !DConfigManager::instance()->value(kViewDConfName,
+                                                       kOpenFolderWindowsInASeparateProcess, false)
+                             .toBool();
         dpfSignalDispatcher->publish(GlobalEventType::kOpenNewWindow, QUrl(), flag);
     }
     for (const QUrl &url : argumentUrls)
@@ -321,9 +322,9 @@ void CommandParser::openWindowWithUrl(const QUrl &url)
             dpfSignalDispatcher->publish(GlobalEventType::kLoadPlugins, QStringList() << name);
         });
     }
-    auto flag = DConfigManager::instance()->
-            value(kViewDConfName,
-                  kOpenFolderWindowsInASeparateProcess, false).toBool();
+    auto flag = DConfigManager::instance()->value(kViewDConfName,
+                                                  kOpenFolderWindowsInASeparateProcess, false)
+                        .toBool();
     flag = flag ? false : isSet("n") || isSet("s") || isSet("sessionfile");
     dpfSignalDispatcher->publish(GlobalEventType::kOpenNewWindow, url, flag);
 }
@@ -386,7 +387,7 @@ void CommandParser::processEvent()
     }
     case GlobalEventType::kMoveToTrash: {
         if (SystemPathUtil::instance()->checkContainsSystemPath(srcUrls)
-                || FileUtils::isTrashFile(srcUrls.first()))
+            || FileUtils::isTrashFile(srcUrls.first()))
             return;
         dpfSignalDispatcher->publish(GlobalEventType::kMoveToTrash, 0, srcUrls, AbstractJobHandler::JobFlag::kNoHint, nullptr);
         break;
