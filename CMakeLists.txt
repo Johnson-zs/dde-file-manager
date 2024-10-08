@@ -103,17 +103,11 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # sub directories
 add_subdirectory(src/apps)
-add_subdirectory(src/dfm-base)
-add_subdirectory(src/dfm-extension)
-add_subdirectory(src/dfm-framework)
+add_subdirectory(src/libs)
 add_subdirectory(src/plugins)
 add_subdirectory(src/external)
 add_subdirectory(src/tools)
 add_subdirectory(src/services)
-if(OPT_ENABLE_QML)
-    add_subdirectory(src/dfm-gui)
-    add_subdirectory(src/dfm-declarative)
-endif()
 
 # docs
 if(OPT_ENABLE_BUILD_DOCS)

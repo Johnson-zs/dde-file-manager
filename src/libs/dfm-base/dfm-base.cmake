@@ -112,7 +112,8 @@ target_link_libraries(${BIN_NAME} PUBLIC
 
 target_include_directories(${BIN_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/libs
     ${DFM_IO_HEADERS}
     ${DFM_MOUNT_HEADERS}
     ${DFM_BURN_HEADERS}

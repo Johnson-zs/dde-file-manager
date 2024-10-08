@@ -14,7 +14,7 @@ FILE (GLOB_RECURSE MOUNT_PLUGIN_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.json"
-    "${CMAKE_SOURCE_DIR}/src/dfm-base/dbusservice/global_server_defines.h"
+    "${CMAKE_SOURCE_DIR}/src/libs/dfm-base/dbusservice/global_server_defines.h"
 )
 
 find_package(Qt5Widgets REQUIRED)
@@ -53,7 +53,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${DtkGui_INCLUDE_DIRS}
     ${Gesttings_INCLUDE_DIRS}
     ${DdeDockInterface_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/src/dfm-base/dbusservice
+    ${CMAKE_SOURCE_DIR}/src/libs/dfm-base/dbusservice
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
