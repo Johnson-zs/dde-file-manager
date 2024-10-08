@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+set_and_check(DDEDesktopWidgets_INCLUDE_DIR "@CMAKE_INSTALL_FULL_INCLUDEDIR@")
+set(DDEDesktopWidgets_PLUGIN_DIR "@PACKAGE_PLUGIN_INSTALL_DIR@")
+set(DDEDesktopWidgets_LIBRARIES "@BIN_NAME@")
+
+function(install_dde_desktop_widgets_plugin plugin)
+    install(TARGETS ${plugin} DESTINATION ${DDEDesktopWidgets_PLUGIN_DIR})
+endfunction()
+
+check_required_components(DDEDesktopWidgets)

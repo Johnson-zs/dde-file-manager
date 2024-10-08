@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: 2024 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: CC0-1.0
+#ifndef DDPLUGIN_WIDGETS_GLOBAL_H
+#define DDPLUGIN_WIDGETS_GLOBAL_H
+
+#include <dfm-base/dfm_log_defines.h>
+
+#define DDP_WIDGETS_NAMESPACE ddplugin_widgets
+
+#define DDP_WIDGETS_BEGIN_NAMESPACE namespace DDP_WIDGETS_NAMESPACE {
+#define DDP_WIDGETS_END_NAMESPACE }
+#define DDP_WIDGETS_USE_NAMESPACE using namespace DDP_WIDGETS_NAMESPACE;
+
+DDP_WIDGETS_BEGIN_NAMESPACE
+DFM_LOG_USE_CATEGORY(DDP_WIDGETS_NAMESPACE)
+DDP_WIDGETS_END_NAMESPACE
+
+#endif   // DDPLUGIN_WIDGETS_GLOBAL_H

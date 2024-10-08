@@ -1,0 +1,2 @@
+usr/include/dde-desktop-widgets/*
+usr/lib/*/cmake/DDEDesktopWidgets/*.cmake

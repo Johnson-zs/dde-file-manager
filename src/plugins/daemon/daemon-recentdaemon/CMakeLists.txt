@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(serverplugin-recentdaemon)
+project(daemonplugin-recentdaemon)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(RecentManager_XML ${DFM_DBUS_XML_DIR}/org.deepin.Filemanager.Daemon.RecentManager.xml)
