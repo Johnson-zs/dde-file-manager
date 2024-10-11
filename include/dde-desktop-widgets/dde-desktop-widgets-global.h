@@ -5,9 +5,12 @@
 #pragma once
 
 #include <QtCore/qglobal.h>
+#include <QLoggingCategory>
 
 #define WIDGETS_NAMESPACE ddw
 
 #define WIDGETS_BEGIN_NAMESPACE namespace WIDGETS_NAMESPACE {
 #define WIDGETS_END_NAMESPACE }
 #define WIDGETS_USE_NAMESPACE using namespace WIDGETS_NAMESPACE;
+
+Q_DECLARE_LOGGING_CATEGORY(logDDW)
