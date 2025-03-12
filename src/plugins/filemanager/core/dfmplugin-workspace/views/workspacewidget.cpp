@@ -76,7 +76,7 @@ void WorkspaceWidget::setCurrentUrl(const QUrl &url)
             return;
 
         bool animEnable = DConfigManager::instance()->value(kAnimationDConfName, kAnimationEnable, true).toBool();
-        if (animEnable) {
+        if (false) {
             auto contentWidget = curView->contentWidget();
             if (!contentWidget)
                 contentWidget = curView->widget();

@@ -190,51 +190,45 @@ QList<CrumbData> TitleBarHelper::tansToCrumbDataList(const QList<QVariantMap> &m
     return group;
 }
 
-void TitleBarHelper::handlePressed(QWidget *sender, const QString &text, bool *isSearch)
+QUrl TitleBarHelper::getCurrentUrl(QWidget *sender)
 {
-    const auto &currentDir = QDir::currentPath();
     QUrl currentUrl;
     auto curTitleBar = findTileBarByWindowId(windowId(sender));
     if (curTitleBar)
         currentUrl = curTitleBar->currentUrl();
+    return currentUrl;
+}
 
-    if (dfmbase::FileUtils::isLocalFile(currentUrl))
-        QDir::setCurrent(currentUrl.toLocalFile());
+bool TitleBarHelper::isSearchDisabled(const QUrl &currentUrl)
+{
+    if (!currentUrl.isValid())
+        return false;
 
-    QString inputStr = text;
-    TitleBarEventCaller::sendCheckAddressInputStr(sender, &inputStr);
+    return dpfSlotChannel->push("dfmplugin_search", "slot_Custom_IsDisableSearch", currentUrl).toBool();
+}
 
-    bool search { false };
-    FinallyUtil finally([&]() {if (isSearch) *isSearch = search; });
-
-    // here, judge whether the text is a local file path.
-    QUrl url(UrlRoute::fromUserInput(inputStr, false));
-    QDir::setCurrent(currentDir);
-
-    QString scheme { url.scheme() };
-    if (!url.scheme().isEmpty() && UrlRoute::hasScheme(scheme)) {
-        if (url.path().isEmpty())
-            url.setPath("/");
-        fmInfo() << "jump :" << inputStr;
+void TitleBarHelper::handleNavigation(QWidget *sender, const QUrl &url)
+{
+    if (url.path().isEmpty()) {
+        QUrl urlWithPath = url;
+        urlWithPath.setPath("/");
+        fmInfo() << "jump :" << urlWithPath;
+        TitleBarEventCaller::sendCd(sender, urlWithPath);
+    } else {
+        fmInfo() << "jump :" << url;
         const FileInfoPointer &info = InfoFactory::create<FileInfo>(url);
         if (info && info->exists() && info->isAttributes(OptInfoType::kIsFile)) {
             TitleBarEventCaller::sendOpenFile(sender, url);
         } else {
             TitleBarEventCaller::sendCd(sender, url);
         }
-    } else {
-        if (currentUrl.isValid()) {
-            bool isDisableSearch = dpfSlotChannel->push("dfmplugin_search", "slot_Custom_IsDisableSearch", currentUrl).toBool();
-            if (isDisableSearch) {
-                fmInfo() << "search : current directory disable to search! " << currentUrl;
-                return;
-            }
-        }
-
-        search = true;
-        fmInfo() << "search :" << text;
-        TitleBarEventCaller::sendSearch(sender, text);
     }
+}
+
+void TitleBarHelper::handleSearch(QWidget *sender, const QString &text)
+{
+    fmInfo() << "search :" << text;
+    TitleBarEventCaller::sendSearch(sender, text);
 }
 
 void TitleBarHelper::openCurrentUrlInNewTab(quint64 windowId)
@@ -339,4 +333,47 @@ QString TitleBarHelper::getDisplayName(const QString &name)
     QString displayName { SystemPathUtil::instance()->systemPathDisplayName(name) };
     displayName = displayName.isEmpty() ? name : displayName;
     return displayName;
+}
+
+// 新增方法：判断输入类型
+InputType TitleBarHelper::determineInputType(QWidget *sender, const QString &text, QUrl *outUrl)
+{
+    // 获取当前URL
+    QUrl currentUrl = getCurrentUrl(sender);
+
+    // 处理输入字符串
+    QString inputStr = text;
+    TitleBarEventCaller::sendCheckAddressInputStr(sender, &inputStr);
+
+    // 保存当前目录
+    const auto &currentDir = QDir::currentPath();
+
+    // 设置工作目录（用于URL解析）
+    if (dfmbase::FileUtils::isLocalFile(currentUrl))
+        QDir::setCurrent(currentUrl.toLocalFile());
+
+    // 判断输入是否为URL
+    QUrl url(UrlRoute::fromUserInput(inputStr, false));
+
+    // 恢复原始工作目录
+    QDir::setCurrent(currentDir);
+
+    // 如果需要返回URL
+    if (outUrl)
+        *outUrl = url;
+
+    // 判断操作类型
+    QString scheme { url.scheme() };
+    if (!url.scheme().isEmpty() && UrlRoute::hasScheme(scheme)) {
+        // 是有效URL，应该导航
+        return InputType::Navigation;
+    } else {
+        // 检查是否禁用搜索
+        if (isSearchDisabled(currentUrl)) {
+            return InputType::Disabled;
+        } else {
+            // 执行搜索
+            return InputType::Search;
+        }
+    }
 }

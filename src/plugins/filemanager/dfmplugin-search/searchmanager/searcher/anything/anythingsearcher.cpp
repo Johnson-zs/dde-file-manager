@@ -4,6 +4,7 @@
 
 #include "anythingsearcher.h"
 #include "utils/searchhelper.h"
+#include "perf/newsearchmanager.h"
 
 #include <dfm-base/base/urlroute.h>
 #include <dfm-base/utils/fileutils.h>
@@ -69,17 +70,7 @@ bool AnythingSearcher::search()
 
     notifyTimer.start();
 
-    // 直接调用新的search接口
-    const QDBusPendingReply<QStringList> reply = anythingInterface->asyncCallWithArgumentList("search", { searchPath, keyword });
-    auto results = reply.value();
-
-    if (reply.error().type() != QDBusError::NoError) {
-        fmWarning() << "deepin-anything search failed:"
-                    << QDBusError::errorString(reply.error().type())
-                    << reply.error().message();
-        status.storeRelease(kCompleted);
-        return false;
-    }
+    auto results = NewSearchManager::instance().searchSync(searchPath, keyword);
 
     QHash<QString, QSet<QString>> hiddenFileHash;
     results = batchExtract(results);

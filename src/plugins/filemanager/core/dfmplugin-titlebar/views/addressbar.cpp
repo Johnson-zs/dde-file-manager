@@ -519,7 +519,15 @@ void AddressBarPrivate::onTextEdited(const QString &text)
     // blumia: Assume address is: /aa/bbbb/cc , completion prefix should be "cc",
     //         completerBaseString should be "/aa/bbbb/"
     updateCompletionState(text);
-    TitleBarHelper::handlePressed(q, text);
+
+    // 判断输入类型
+    QUrl targetUrl;
+    InputType inputType = TitleBarHelper::determineInputType(q, text, &targetUrl);
+
+    // 根据类型执行相应操作
+    if (inputType == InputType::Search) {
+        TitleBarHelper::handleSearch(q, text);
+    }
 }
 
 void AddressBarPrivate::onReturnPressed()
@@ -553,21 +561,31 @@ void AddressBarPrivate::onReturnPressed()
         }
     }
 
-    bool isSearch { false };
     if (text == QObject::tr("Clear search history")) {
         emit q->escKeyPressed();
-        ;
         auto result = showClearSearchHistory();
         if (result == DDialog::Accepted)
             q->clearSearchHistory();
         return;
     }
-    TitleBarHelper::handlePressed(q, text, &isSearch);
 
-    if (isSearch) {
-        startSpinner();
-    } else {
+    // 判断输入类型
+    QUrl targetUrl;
+    InputType inputType = TitleBarHelper::determineInputType(q, text, &targetUrl);
+
+    // 根据类型执行相应操作
+    switch (inputType) {
+    case InputType::Navigation:
+        TitleBarHelper::handleNavigation(q, targetUrl);
         emit q->urlChanged();
+        break;
+    case InputType::Search:
+        TitleBarHelper::handleSearch(q, text);
+        startSpinner();
+        break;
+    case InputType::Disabled:
+        fmInfo() << "search : current directory disable to search! " << TitleBarHelper::getCurrentUrl(q);
+        break;
     }
 }
 

@@ -55,7 +55,7 @@ void TaskCommanderPrivate::onUnearthed(AbstractSearcher *searcher)
         bool isEmpty = resultList.isEmpty();
 
         resultList += results;
-        //回到主线程发送信号
+        // 回到主线程发送信号
         if (isEmpty)
             QMetaObject::invokeMethod(q, "matched", Qt::QueuedConnection, Q_ARG(QString, taskId));
     }
@@ -146,7 +146,7 @@ void TaskCommander::createSearcher(const QUrl &url, const QString &keyword)
     // 全文搜索
     if (FullTextSearcher::isSupport(url)) {
         FullTextSearcher *searcher = new FullTextSearcher(url, keyword, this);
-        //直连，在线程处理
+        // 直连，在线程处理
         connect(searcher, &AbstractSearcher::unearthed, d, &TaskCommanderPrivate::onUnearthed, Qt::DirectConnection);
         fmInfo() << "Using Full-Text search";
         d->allSearchers << searcher;
@@ -154,7 +154,7 @@ void TaskCommander::createSearcher(const QUrl &url, const QString &keyword)
 
     // 文件名搜索
     auto *searcher = d->createFileNameSearcher(url, keyword);
-    //直连，在线程处理
+    // 直连，在线程处理
     connect(searcher, &AbstractSearcher::unearthed, d, &TaskCommanderPrivate::onUnearthed, Qt::DirectConnection);
     d->allSearchers << searcher;
 }

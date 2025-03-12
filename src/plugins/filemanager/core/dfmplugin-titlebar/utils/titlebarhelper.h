@@ -14,6 +14,13 @@
 
 namespace dfmplugin_titlebar {
 
+// 定义输入类型枚举
+enum class InputType {
+    Navigation,  // 导航到URL
+    Search,      // 执行搜索
+    Disabled     // 搜索被禁用
+};
+
 class TitleBarWidget;
 class TitleBarHelper
 {
@@ -26,7 +33,15 @@ public:
     static void createSettingsMenu(quint64 id);
     static QList<CrumbData> crumbSeprateUrl(const QUrl &url);
     static QList<CrumbData> tansToCrumbDataList(const QList<QVariantMap> &mapGroup);
-    static void handlePressed(QWidget *sender, const QString &text, bool *isSearch = nullptr);
+    
+    // 新增方法：判断输入类型
+    static InputType determineInputType(QWidget *sender, const QString &text, QUrl *outUrl = nullptr);
+    
+    // 保留原有的处理方法
+    static QUrl getCurrentUrl(QWidget *sender);
+    static bool isSearchDisabled(const QUrl &currentUrl);
+    static void handleNavigation(QWidget *sender, const QUrl &url);
+    static void handleSearch(QWidget *sender, const QString &text);
 
     static void openCurrentUrlInNewTab(quint64 windowId);
     static void showSettingsDialog(quint64 windowId);
