@@ -94,13 +94,30 @@ static QStringList search2(const QString &orginPath, const QString &key, bool nr
 
         QStringList results;
         results.reserve(search_results->scoreDocs.size());
+        QStringList dirs, files;
+        dirs.reserve(search_results->scoreDocs.size() / 2);   // 预估目录数量
+        files.reserve(search_results->scoreDocs.size() / 2);   // 预估文件数量
+
         for (const auto &score_doc : search_results->scoreDocs) {
             DocumentPtr doc = searcher->doc(score_doc->doc);
             auto result = QString::fromStdWString(doc->get(L"full_path"));
-            if (result.startsWith(path)) {
-                results.append(std::move(result));
+
+            // 先进行路径过滤，避免不必要的类型判断
+            if (!result.startsWith(path)) continue;
+
+            // 延迟获取类型，只有通过路径过滤的才需要判断
+            auto type = QString::fromStdWString(doc->get(L"file_type"));
+
+            // 使用移动语义 + 条件分类
+            if (type == "dir") {
+                dirs.append(std::move(result));   // 目录列表
+            } else {
+                files.append(std::move(result));   // 文件列表
             }
         }
+
+        // 合并结果（O(1) 时间复杂度操作）
+        results = std::move(dirs) + std::move(files);
 
         return results;
     } catch (const LuceneException &e) {

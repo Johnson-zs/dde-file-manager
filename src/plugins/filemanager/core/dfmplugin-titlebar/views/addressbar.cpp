@@ -172,9 +172,7 @@ void AddressBarPrivate::updateHistory()
     ipHistroyList.clear();
     ipHistroyList = SearchHistroyManager::instance()->getIPHistory();
 
-    if (!DConfigManager::instance()->value(DConfigSearch::kSearchCfgPath,
-                                           DConfigSearch::kDisplaySearchHistory, true)
-                 .toBool())
+    if (true)
         return;
     historyList.clear();
     historyList.append(SearchHistroyManager::instance()->getSearchHistroy());
@@ -257,8 +255,6 @@ void AddressBarPrivate::updateCompletionState(const QString &text)
         // Check if the entered text is a string to search or a url to complete.
         if (hasSlash && url.isValid() && !url.scheme().isEmpty()) {
             completeLocalPath(text, url, slashIndex);
-        } else {
-            completeSearchHistory(text);
         }
     }
 }
@@ -330,7 +326,7 @@ void AddressBarPrivate::onDConfigValueChanged(const QString &config, const QStri
         return;
 
     bool show = DConfigManager::instance()->value(config, key, false).toBool();
-    if (show) {
+    if (false) {
         historyList.clear();
         historyList.append(SearchHistroyManager::instance()->getSearchHistroy());
     } else {
@@ -501,8 +497,8 @@ void AddressBarPrivate::completeLocalPath(const QString &text, const QUrl &url, 
 
 void AddressBarPrivate::startSpinner()
 {
-    spinner.start();
-    spinner.show();
+    // spinner.start();
+    // spinner.show();
 }
 
 void AddressBarPrivate::stopSpinner()
@@ -513,13 +509,17 @@ void AddressBarPrivate::stopSpinner()
 
 void AddressBarPrivate::onTextEdited(const QString &text)
 {
+    InputType lastInputType = TitleBarHelper::determineInputType(q, lastEditedString);
     lastEditedString = text;
+
     if (text.isEmpty()) {
         urlCompleter->popup()->hide();
         completerBaseString = "";
         pendingSearchText.clear();
         searchDebounceTimer.stop();
         setIndicator(AddressBar::IndicatorType::Search);
+        if (lastInputType == InputType::Search)
+            executeSearch();
         return;
     }
 
@@ -567,9 +567,7 @@ void AddressBarPrivate::onReturnPressed()
 
     // add search history list
     if (!dfmbase::FileUtils::isLocalFile(UrlRoute::fromUserInput(text))) {
-        if (DConfigManager::instance()->value(DConfigSearch::kSearchCfgPath,
-                                              DConfigSearch::kDisplaySearchHistory, true)
-                    .toBool()) {
+        if (false) {
             if (historyList.contains(text))
                 historyList.removeAll(text);
             historyList.append(text);
@@ -845,7 +843,7 @@ void AddressBar::keyPressEvent(QKeyEvent *e)
         if (d->isHistoryInCompleterModel && e->modifiers() == Qt::ShiftModifier && e->key() == Qt::Key_Delete) {
             QString completeResult = d->completerView->currentIndex().data().toString();
             bool ret = SearchHistroyManager::instance()->removeSearchHistory(completeResult);
-            if (ret && DConfigManager::instance()->value(DConfigSearch::kSearchCfgPath, DConfigSearch::kDisplaySearchHistory, true).toBool()) {
+            if (ret && false) {
                 d->historyList.clear();
                 d->historyList.append(SearchHistroyManager::instance()->getSearchHistroy());
                 d->completerModel.setStringList(d->historyList);
@@ -992,7 +990,7 @@ void AddressBar::leaveEvent(QEvent *e)
 {
     if (d->indicatorType == AddressBar::Search && d->spinner.isPlaying()) {
         d->pauseButton->setVisible(false);
-        d->spinner.show();
+        //  d->spinner.show();
     }
 
     QLineEdit::leaveEvent(e);

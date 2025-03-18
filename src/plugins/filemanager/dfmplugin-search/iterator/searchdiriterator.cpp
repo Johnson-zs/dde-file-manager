@@ -190,7 +190,12 @@ bool SearchDirIterator::initIterator()
         redirectedPath = targetUrl.toLocalFile();
     }
     auto keyword = SearchHelper::searchKeyword(d->fileUrl);
-    d->anythingResults = NewSearchManager::instance().searchSync(redirectedPath, keyword);
+    if (keyword.isEmpty()) {
+        d->anythingResults.clear();
+        NewSearchManager::instance().clearCache();
+    } else {
+        d->anythingResults = NewSearchManager::instance().searchSync(redirectedPath, keyword);
+    }
 
     return true;
 }
@@ -200,7 +205,6 @@ QList<SortInfoPointer> SearchDirIterator::sortFileInfoList()
     QList<SortInfoPointer> wsortlist;
 
     for (const auto &result : d->anythingResults) {
-
         SortInfoPointer info(new SortFileInfo);
         info->setUrl(QUrl::fromLocalFile(result));
         wsortlist.append(info);
