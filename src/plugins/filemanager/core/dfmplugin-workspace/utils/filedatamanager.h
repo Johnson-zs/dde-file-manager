@@ -54,6 +54,7 @@ private:
     // scheme in cacheDataSchemes will have cache
     QList<QString> cacheDataSchemes {};
     QMap<QUrl, int> dataRefMap {};
+    QList<RootInfo *> deleteLaterList {};
 };
 
 }
