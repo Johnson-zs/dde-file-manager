@@ -8,6 +8,7 @@
 #include "utils/custommanager.h"
 #include "events/searcheventcaller.h"
 #include "searchmanager/searchmanager.h"
+#include "searchmanager/searcher/anything/perf/newsearchmanager.h"
 
 #include <dfm-base/base/schemefactory.h>
 #include <dfm-base/utils/universalutils.h>
@@ -172,6 +173,40 @@ void SearchDirIterator::close()
         return;
 
     SearchManager::instance()->stop(d->taskId);
+}
+
+bool SearchDirIterator::oneByOne()
+{
+    return false;
+}
+
+bool SearchDirIterator::initIterator()
+{
+    auto targetUrl = SearchHelper::searchTargetUrl(d->fileUrl);
+    QString redirectedPath = CustomManager::instance()->redirectedPath(targetUrl);
+    if (!redirectedPath.isEmpty()) {
+        targetUrl = QUrl::fromLocalFile(redirectedPath);
+    } else {
+        redirectedPath = targetUrl.toLocalFile();
+    }
+    auto keyword = SearchHelper::searchKeyword(d->fileUrl);
+    d->anythingResults = NewSearchManager::instance().searchSync(redirectedPath, keyword);
+
+    return true;
+}
+
+QList<SortInfoPointer> SearchDirIterator::sortFileInfoList()
+{
+    QList<SortInfoPointer> wsortlist;
+
+    for (const auto &result : d->anythingResults) {
+
+        SortInfoPointer info(new SortFileInfo);
+        info->setUrl(QUrl::fromLocalFile(result));
+        wsortlist.append(info);
+    }
+
+    return wsortlist;
 }
 
 }

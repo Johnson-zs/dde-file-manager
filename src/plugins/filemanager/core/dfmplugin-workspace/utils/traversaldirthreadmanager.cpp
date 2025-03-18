@@ -10,7 +10,7 @@
 #include <QElapsedTimer>
 #include <QDebug>
 
-typedef QList<QSharedPointer<DFMBASE_NAMESPACE::SortFileInfo>>& SortInfoList;
+typedef QList<QSharedPointer<DFMBASE_NAMESPACE::SortFileInfo>> &SortInfoList;
 
 using namespace dfmbase;
 using namespace dfmplugin_workspace;
@@ -71,8 +71,8 @@ void TraversalDirThreadManager::start()
 {
     running = true;
     if (this->sortRole != dfmio::DEnumerator::SortRoleCompareFlag::kSortRoleCompareDefault
-            && dirIterator->oneByOne())
-        dirIterator->setProperty("QueryAttributes","standard::name,standard::type,standard::size,\
+        && dirIterator->oneByOne())
+        dirIterator->setProperty("QueryAttributes", "standard::name,standard::type,standard::size,\
                                   standard::size,standard::is-symlink,standard::symlink-target,access::*,time::*");
     auto local = dirIterator.dynamicCast<LocalDirIterator>();
     if (local && local->oneByOne()) {
@@ -157,8 +157,6 @@ int TraversalDirThreadManager::iteratorOneByOne(const QElapsedTimer &timere)
         // 调用一次fileinfo进行文件缓存
         const auto &fileUrl = dirIterator->next();
         if (!fileUrl.isValid())
-            continue;
-        if (urls.contains(fileUrl))
             continue;
         urls.insert(fileUrl);
         auto fileInfo = dirIterator->fileInfo();

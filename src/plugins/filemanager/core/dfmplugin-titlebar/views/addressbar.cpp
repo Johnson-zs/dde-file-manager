@@ -82,6 +82,10 @@ void AddressBarPrivate::initializeUi()
     q->setAlignment(Qt::AlignLeft);
     q->setFocusPolicy(Qt::ClickFocus);
 
+    // 添加搜索防抖计时器
+    searchDebounceTimer.setInterval(300);   // 300毫秒的防抖延迟
+    searchDebounceTimer.setSingleShot(true);
+
     initUiForSizeMode();
 }
 
@@ -128,6 +132,9 @@ void AddressBarPrivate::initConnect()
 #endif
     connect(Application::instance(), &Application::clearSearchHistory, this,
             &AddressBarPrivate::onClearSearchHistory);
+
+    // 连接搜索防抖计时器
+    connect(&searchDebounceTimer, &QTimer::timeout, this, &AddressBarPrivate::executeSearch);
 }
 
 void AddressBarPrivate::initUiForSizeMode()
@@ -155,6 +162,9 @@ void AddressBarPrivate::initData()
     completerView->setFocus(Qt::FocusReason::PopupFocusReason);
 
     updateHistory();
+
+    // 设置最小搜索字符数
+    minSearchChars = 2;   // 至少需要2个字符才会触发搜索
 }
 
 void AddressBarPrivate::updateHistory()
@@ -507,6 +517,8 @@ void AddressBarPrivate::onTextEdited(const QString &text)
     if (text.isEmpty()) {
         urlCompleter->popup()->hide();
         completerBaseString = "";
+        pendingSearchText.clear();
+        searchDebounceTimer.stop();
         setIndicator(AddressBar::IndicatorType::Search);
         return;
     }
@@ -526,8 +538,25 @@ void AddressBarPrivate::onTextEdited(const QString &text)
 
     // 根据类型执行相应操作
     if (inputType == InputType::Search) {
-        TitleBarHelper::handleSearch(q, text);
+        // 停止之前的防抖计时器
+        QString oldPendingSearchText = pendingSearchText;
+        searchDebounceTimer.stop();
+        pendingSearchText = text;
+        // 如果文本长度大于等于最小搜索字符数，启动防抖计时器
+        if (text.length() <= minSearchChars) {
+            fmDebug() << "=======> request search1:" << pendingSearchText;
+            searchDebounceTimer.start();
+        } else {
+            fmDebug() << "=======> request search2:" << pendingSearchText;
+            executeSearch();
+        }
     }
+}
+
+// 新增方法：执行搜索
+void AddressBarPrivate::executeSearch()
+{
+    TitleBarHelper::handleSearch(q, pendingSearchText);
 }
 
 void AddressBarPrivate::onReturnPressed()
@@ -580,6 +609,8 @@ void AddressBarPrivate::onReturnPressed()
         emit q->urlChanged();
         break;
     case InputType::Search:
+        // 停止防抖计时器，立即执行搜索
+        searchDebounceTimer.stop();
         TitleBarHelper::handleSearch(q, text);
         startSpinner();
         break;

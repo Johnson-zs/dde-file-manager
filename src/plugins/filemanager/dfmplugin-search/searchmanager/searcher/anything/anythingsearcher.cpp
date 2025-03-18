@@ -79,16 +79,16 @@ bool AnythingSearcher::search()
         if (status.loadAcquire() != kRuning)
             return false;
 
-        if (!SearchHelper::instance()->isHiddenFile(item, hiddenFileHash, searchPath)) {
-            // 搜索路径还原
-            if (isBindPath && item.startsWith(searchPath))
-                item = item.replace(searchPath, originalPath);
-            QMutexLocker lk(&mutex);
-            allResults << QUrl::fromLocalFile(item);
-        }
-
+        // if (!SearchHelper::instance()->isHiddenFile(item, hiddenFileHash, searchPath)) {
+        //     // 搜索路径还原
+        //     if (isBindPath && item.startsWith(searchPath))
+        //         item = item.replace(searchPath, originalPath);
+        //     QMutexLocker lk(&mutex);
+        //     allResults << QUrl::fromLocalFile(item);
+        // }
+        allResults << QUrl::fromLocalFile(item);
         // 推送
-        tryNotify();
+        // tryNotify();
     }
 
     // 检查是否还有数据
@@ -133,12 +133,12 @@ bool AnythingSearcher::isSupported(const QUrl &url, bool &isBindPath)
     if (!url.isValid() || UrlRoute::isVirtual(url))
         return false;
 
-    static QDBusInterface anything("com.deepin.anything",
-                                   "/com/deepin/anything",
-                                   "com.deepin.anything",
-                                   QDBusConnection::systemBus());
-    if (!anything.isValid())
-        return false;
+    // static QDBusInterface anything("com.deepin.anything",
+    //                                "/com/deepin/anything",
+    //                                "com.deepin.anything",
+    //                                QDBusConnection::systemBus());
+    // if (!anything.isValid())
+    //     return false;
 
     return true;
 }

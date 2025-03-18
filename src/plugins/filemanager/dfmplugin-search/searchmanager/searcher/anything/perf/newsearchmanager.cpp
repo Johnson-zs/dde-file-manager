@@ -7,6 +7,110 @@
 #include <QDebug>
 #include <QThread>
 
+#include <lucene++/LuceneHeaders.h>
+
+using namespace Lucene;
+namespace {
+
+// 获取索引目录路径：/run/user/[当前用户id]/deepin-anything-server
+static QString getIndexDirectory()
+{
+    QString indexDir = QString("/run/user/%1/deepin-anything-server").arg(getuid());
+    return indexDir;
+}
+
+static QString getHomeDirectory()
+{
+    QString homeDir;
+
+    if (QFileInfo::exists("/data/home")) {
+        homeDir = "/data";
+    } else if (QFileInfo::exists("/persistent/home")) {
+        homeDir = "/persistent";
+    }
+
+    homeDir.append(QDir::homePath());
+
+    return homeDir;
+}
+
+static QStringList search2(const QString &orginPath, const QString &key, bool nrt)
+{
+    QString keywords = key;
+    QString path = orginPath;
+    if (path.startsWith(QDir::homePath()))
+        path.replace(0, QDir::homePath().length(), getHomeDirectory());
+
+    if (keywords.isEmpty()) {
+        return {};
+    }
+
+    // 原始词条
+    String query_terms = StringUtils::toUnicode(keywords.toStdString());
+
+    // 给普通 parser 用
+    if (keywords.at(0) == QChar('*') || keywords.at(0) == QChar('?')) {
+        keywords = keywords.mid(1);
+    }
+
+    try {
+        int32_t max_results;
+
+        // 获取索引目录
+        QString indexDir = getIndexDirectory();
+        qDebug() << "搜索索引目录:" << indexDir;
+
+        // 打开索引目录
+        FSDirectoryPtr directory = FSDirectory::open(StringUtils::toUnicode(indexDir.toStdString()));
+
+        // 检查索引是否存在
+        if (!IndexReader::indexExists(directory)) {
+            qWarning() << "索引不存在:" << indexDir;
+            return QStringList();
+        }
+
+        // 打开索引读取器
+        IndexReaderPtr reader = IndexReader::open(directory, true);
+        if (reader->numDocs() == 0) {
+            qWarning() << "索引为空，没有文档";
+            return QStringList();
+        }
+
+        // 创建搜索器
+        SearcherPtr searcher = newLucene<IndexSearcher>(reader);
+
+        if (reader->numDocs() == 0) {
+            qWarning() << "索引为空，没有文档";
+            return QStringList();
+        }
+
+        max_results = reader->numDocs();
+
+        String queryString = L"*" + StringUtils::toLower(StringUtils::toUnicode(keywords.toStdString())) + L"*";
+        TermPtr term = newLucene<Term>(L"file_name", queryString);
+        QueryPtr query = newLucene<WildcardQuery>(term);
+
+        auto search_results = searcher->search(query, max_results);
+
+        QStringList results;
+        results.reserve(search_results->scoreDocs.size());
+        for (const auto &score_doc : search_results->scoreDocs) {
+            DocumentPtr doc = searcher->doc(score_doc->doc);
+            auto result = QString::fromStdWString(doc->get(L"full_path"));
+            if (result.startsWith(path)) {
+                results.append(std::move(result));
+            }
+        }
+
+        return results;
+    } catch (const LuceneException &e) {
+
+        return {};
+    }
+}
+
+}   // namespace
+
 NewSearchManager::NewSearchManager(QObject *parent)
     : QObject(parent), m_searcher(nullptr), m_ownsSearcher(false)
 {
@@ -304,8 +408,6 @@ void NewSearchManager::updateCacheUsage(const QString &key)
 
 QStringList NewSearchManager::searchSync(const QString &searchPath, const QString &searchText)
 {
-    QMutexLocker locker(&m_mutex);
-
     // 如果输入为空，直接返回空结果
     if (searchText.isEmpty()) {
         return QStringList();
@@ -313,7 +415,7 @@ QStringList NewSearchManager::searchSync(const QString &searchPath, const QStrin
 
     // 尝试从缓存获取结果
     {
-        //   QReadLocker readLock(&m_cacheLock);
+        QMutexLocker guard(&m_mutex);
         QStringList cachedResults;
         if (!m_lastSearchText.isEmpty() && tryGetFromCache(searchText, cachedResults)) {
             qDebug() << "===> searchSync: using cache for " << searchText;
@@ -321,18 +423,16 @@ QStringList NewSearchManager::searchSync(const QString &searchPath, const QStrin
         }
     }
 
-    // 如果没有缓存，直接调用搜索器的同步搜索方法
-    QMutexLocker searcherLocker(&m_searcherMutex);
-    if (!m_searcher) {
-        qWarning() << "Searcher not initialized";
-        return QStringList();
-    }
+    QStringList results = ::search2(searchPath, searchText, true);
 
-    // 执行同步搜索
-    QStringList results = m_searcher->searchSync(searchPath, searchText);
+    // AnythingSearcher searcher;
+    // // 执行同步搜索
+    // QStringList results = searcher.searchSync(searchPath, searchText);
 
     // 缓存结果
+
     if (!results.isEmpty()) {
+        QMutexLocker guard(&m_mutex);
         addToCache(searchText, results);
         m_lastSearchText = searchText;
     }

@@ -50,6 +50,7 @@ private:
     QString taskId;
     QMutex mutex;
     std::once_flag searchOnceFlag;
+    QStringList anythingResults;
 
     SearchDirIterator *q;
     QScopedPointer<DFMBASE_NAMESPACE::LocalFileWatcher> searchRootWatcher;

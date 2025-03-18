@@ -59,7 +59,7 @@ class AddressBarPrivate : public QObject
     QString lastEditedString;
     AddressBar::IndicatorType indicatorType { AddressBar::IndicatorType::Search };
     int lastPressedKey { Qt::Key_D };   // just an init value
-    int lastPreviousKey { Qt::Key_Control };   //记录上前一个按钮
+    int lastPreviousKey { Qt::Key_Control };   // 记录上前一个按钮
     int selectPosStart { 0 };
     CrumbInterface *crumbController { nullptr };
     CompleterViewModel completerModel;
@@ -76,6 +76,9 @@ class AddressBarPrivate : public QObject
     QRegularExpression protocolIPRegExp;   // smb://ip, ftp://ip, sftp://ip
     QString completionPrefix;
     bool inputIsIpAddress { false };
+    QTimer searchDebounceTimer;   // 搜索防抖计时器
+    QString pendingSearchText;   // 待搜索的文本
+    int minSearchChars;   // 最小搜索字符数
 
 public:
     explicit AddressBarPrivate(AddressBar *qq);
@@ -94,6 +97,7 @@ public:
     void completeSearchHistory(const QString &text);
     void completeIpAddress(const QString &text);
     void completeLocalPath(const QString &text, const QUrl &url, int slashIndex);
+    void executeSearch();   // 执行搜索
 
 public Q_SLOTS:
     void startSpinner();
@@ -120,4 +124,4 @@ protected:
 
 }
 
-#endif   //AddressBar_P_H
+#endif   // AddressBar_P_H

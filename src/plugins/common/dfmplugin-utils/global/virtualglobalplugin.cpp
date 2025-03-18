@@ -16,11 +16,12 @@ DFMBASE_USE_NAMESPACE
 
 static QSharedPointer<dfmbase::FileInfo> transFileInfo(QSharedPointer<dfmbase::FileInfo> fileInfo)
 {
+    auto url = fileInfo->urlOf(UrlInfoType::kUrl);
     // no translate for gvfs file, invoking suffix/mimeTypeName might cost huge time
-    if (fileInfo->urlOf(UrlInfoType::kUrl).path().contains(QRegularExpression(DFMBASE_NAMESPACE::Global::Regex::kGvfsRoot)))
+    if (url.path().contains(QRegularExpression(DFMBASE_NAMESPACE::Global::Regex::kGvfsRoot)))
         return fileInfo;
 
-    if (FileUtils::isDesktopFileInfo(fileInfo)) {
+    if (FileUtils::isDesktopFileSuffix(url)) {
         const QUrl &url = fileInfo->urlOf(UrlInfoType::kUrl);
         return FileInfoPointer(new DFMBASE_NAMESPACE::DesktopFileInfo(url, fileInfo));
     }

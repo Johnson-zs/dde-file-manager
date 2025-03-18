@@ -31,6 +31,9 @@ public:
     virtual const FileInfoPointer fileInfo() const override;
     virtual QUrl url() const override;
     virtual void close() override;
+    bool oneByOne() override;
+    bool initIterator() override;
+    QList<SortInfoPointer> sortFileInfoList() override;
 
 signals:
     void sigSearch() const;
