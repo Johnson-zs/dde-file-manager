@@ -84,3 +84,12 @@ if(OPT_ENABLE_BUILD_UT)
         add_subdirectory(tests)
     endif()
 endif()
+
+# tests2 - new unit test framework
+option(OPT_ENABLE_BUILD_UT2 "Build new unit tests (tests2)" OFF)
+if(OPT_ENABLE_BUILD_UT2)
+    message(STATUS "Enable tests2: ${BUILD_TESTING}")
+    if(BUILD_TESTING)
+        add_subdirectory(tests2)
+    endif()
+endif()
