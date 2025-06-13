@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "computerview.h"
 #include "computerstatusbar.h"
 #include "private/computerview_p.h"
@@ -149,6 +149,13 @@ void ComputerView::hideEvent(QHideEvent *event)
 ComputerModel *ComputerView::computerModel() const
 {
     return kCptModelIns.data();
+}
+
+void ComputerView::paintEvent(QPaintEvent *event)
+{
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("computer paint"));
+    DListView::paintEvent(event);
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("computer painted"));
 }
 
 void ComputerView::initView()

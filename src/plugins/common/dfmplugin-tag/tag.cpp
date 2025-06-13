@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "tag.h"
 #include "files/tagfileinfo.h"
 #include "files/tagfilewatcher.h"
@@ -101,6 +101,7 @@ void Tag::onWindowOpened(quint64 windId)
         installToSideBar();
     else
         connect(window, &FileManagerWindow::sideBarInstallFinished, this, &Tag::installToSideBar, Qt::DirectConnection);
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("Tag opened"));
 }
 
 void Tag::regTagCrumbToTitleBar()

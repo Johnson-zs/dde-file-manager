@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "config.h"   //cmake
+#include "tools/redbox/src/redbox.h"
+
 #include "singleapplication.h"
 #include "commandparser.h"
 #include "dragmonitor.h"
@@ -154,6 +156,7 @@ static bool blackListFilter(const QString &name)
 
 static bool pluginsLoad()
 {
+    RB_CHECKTIME_WITH_STARTUP("beginload");
     QString msg;
     if (!DConfigManager::instance()->addConfig(kPluginsDConfName, &msg))
         qCWarning(logAppFileManager) << "pluginsLoad: Failed to load plugins dconfig:" << msg;
@@ -188,13 +191,14 @@ static bool pluginsLoad()
     }
     qCInfo(logAppFileManager) << "pluginsLoad: Library paths:" << DApplication::libraryPaths();
     qCInfo(logAppFileManager) << "pluginsLoad: Plugin paths:" << DPF_NAMESPACE::LifeCycle::pluginPaths();
-
+    RB_CHECKTIME_WITH_STARTUP("getpaths");
     // read all plugins in setting paths
     if (!DPF_NAMESPACE::LifeCycle::readPlugins()) {
         qCCritical(logAppFileManager) << "pluginsLoad: Failed to read plugins";
         return false;
     }
 
+    RB_CHECKTIME_WITH_STARTUP("readPlugins");
     // We should make sure that the core plugin is loaded first
     auto corePlugin = DPF_NAMESPACE::LifeCycle::pluginMetaObj(kPluginCore);
     if (corePlugin.isNull()) {
@@ -322,6 +326,7 @@ static void autoReleaseMemory()
 
 int main(int argc, char *argv[])
 {
+    RB_INITIALIZE_WITH_STARTUP(argc, argv);
     initEnv();
 
     // Warning: set log filter must before QApplication inited
@@ -333,7 +338,7 @@ int main(int argc, char *argv[])
 #endif
 
     SingleApplication a(argc, argv);
-
+    RB_CHECKTIME_WITH_STARTUP("SingleApplication");
     // BUG-278055
     initLogSetting();
 
@@ -375,6 +380,7 @@ int main(int argc, char *argv[])
     const QString &uniqueKey = a.applicationName();
 
     bool isSingleInstance = true;
+    RB_CHECKTIME_WITH_STARTUP("parser");
 
     if (!SysInfoUtils::isOpenAsAdmin())
         isSingleInstance = a.setSingleInstance(uniqueKey);
@@ -422,5 +428,6 @@ int main(int argc, char *argv[])
     }
 
     qCInfo(logAppFileManager) << "main: Application exiting with code:" << ret;
+    RB_CLOSE(-1);
     return ret;
 }

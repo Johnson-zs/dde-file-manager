@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "vaultvisiblemanager.h"
 #include "fileutils/vaultfileinfo.h"
 #include "utils/vaulthelper.h"
@@ -132,6 +132,8 @@ void VaultVisibleManager::onWindowOpened(quint64 winID)
         updateSideBarVaultItem();
     else
         connect(window, &FileManagerWindow::sideBarInstallFinished, this, &VaultVisibleManager::updateSideBarVaultItem, Qt::DirectConnection);
+
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("Vault opened"));
 }
 
 void VaultVisibleManager::removeSideBarVaultItem()

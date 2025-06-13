@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "workspace.h"
 #include "views/workspacewidget.h"
 #include "views/fileview.h"
@@ -101,6 +101,7 @@ void Workspace::onWindowOpened(quint64 windId)
     WorkspaceHelper::instance()->addWorkspace(windId, workspace);
 
     Q_EMIT readyToInstallWidget(windId);
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("Workspace opened"));
 }
 
 void Workspace::onWindowClosed(quint64 windId)

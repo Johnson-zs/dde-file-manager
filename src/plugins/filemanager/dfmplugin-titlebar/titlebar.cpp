@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "titlebar.h"
 #include "utils/titlebarhelper.h"
 #include "utils/crumbinterface.h"
@@ -43,11 +43,12 @@ bool TitleBar::start()
     if (searchPlugin && searchPlugin->pluginState() == DPF_NAMESPACE::PluginMetaObject::kStarted) {
         TitleBarHelper::searchEnabled = true;
     } else {
-        connect(DPF_NAMESPACE::Listener::instance(), &DPF_NAMESPACE::Listener::pluginStarted, this,
-            [](const QString &, const QString &name) {
-                if (name == "dfmplugin-search") TitleBarHelper::searchEnabled = true;
-            },
-        Qt::DirectConnection);
+        connect(
+                DPF_NAMESPACE::Listener::instance(), &DPF_NAMESPACE::Listener::pluginStarted, this,
+                [](const QString &, const QString &name) {
+                    if (name == "dfmplugin-search") TitleBarHelper::searchEnabled = true;
+                },
+                Qt::DirectConnection);
     }
 
     return true;
@@ -91,6 +92,7 @@ void TitleBar::onWindowOpened(quint64 windId)
     connect(window, &FileManagerWindow::reqActivateTabByIndex, titleBarWidget, &TitleBarWidget::handleHotketActivateTab);
     connect(window, &FileManagerWindow::windowSplitterWidthChanged, titleBarWidget, &TitleBarWidget::handleSplitterAnimation);
     connect(window, &FileManagerWindow::aboutToPlaySplitterAnimation, titleBarWidget, &TitleBarWidget::handleAboutToPlaySplitterAnim);
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("TitleBar opened"));
 }
 
 void TitleBar::onWindowClosed(quint64 windId)

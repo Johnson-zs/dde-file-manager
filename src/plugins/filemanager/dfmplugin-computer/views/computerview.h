@@ -56,6 +56,7 @@ protected:
     virtual void hideEvent(QHideEvent *event) override;
     virtual void keyPressEvent(QKeyEvent *event) override;
     ComputerModel *computerModel() const;
+    void paintEvent(QPaintEvent *event) override;
 
 private:
     void initView();

@@ -84,3 +84,7 @@ if(OPT_ENABLE_BUILD_UT)
         add_subdirectory(tests)
     endif()
 endif()
+
+option(REDBOX_TESTS "Enable redbox tests" ON)
+message(STATUS "Enable redbox testing: ${REDBOX_TESTS}")
+

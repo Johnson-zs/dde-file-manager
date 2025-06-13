@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "trash.h"
 #include "trashdiriterator.h"
 #include "trashfilewatcher.h"
@@ -75,6 +75,8 @@ void Trash::onWindowOpened(quint64 windId)
         regTrashItemToSideBar();
     else
         connect(window, &FileManagerWindow::sideBarInstallFinished, this, &Trash::regTrashItemToSideBar, Qt::DirectConnection);
+
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("Trash opened"));
 }
 
 void Trash::regTrashCrumbToTitleBar()
@@ -191,7 +193,7 @@ void Trash::followEvents()
                                                 TrashFileHelper::instance(),
                                                 &TrashFileHelper::handleIsSubFile);
                 },
-        Qt::DirectConnection);
+                Qt::DirectConnection);
     }
 }
 

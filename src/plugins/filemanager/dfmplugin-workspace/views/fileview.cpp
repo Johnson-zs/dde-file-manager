@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "headerview.h"
 #include "fileview.h"
 #include "private/fileview_p.h"
@@ -2002,6 +2002,7 @@ bool FileView::eventFilter(QObject *obj, QEvent *event)
 
 void FileView::paintEvent(QPaintEvent *event)
 {
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("file paint"));
     if (d->animationHelper->isWaitingToPlaying() || d->animationHelper->isAnimationPlaying()) {
         d->animationHelper->paintItems();
         itemDelegate()->hideAllIIndexWidget();
@@ -2020,6 +2021,7 @@ void FileView::paintEvent(QPaintEvent *event)
         painter.setPen(pen);
         painter.drawRect(QRectF(kSelectBoxLineWidth / 2, kSelectBoxLineWidth / 2, viewport()->size().width() - kSelectBoxLineWidth, viewport()->size().height() - kSelectBoxLineWidth));
     }
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("file painted"));
 }
 
 void FileView::focusInEvent(QFocusEvent *event)

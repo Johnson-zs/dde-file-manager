@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "computer.h"
 #include "utils/computerutils.h"
 #include "utils/remotepasswdmanager.h"
@@ -133,6 +133,7 @@ void Computer::onWindowOpened(quint64 winId)
     CustomViewExtensionView func { ComputerUtils::devicePropertyDialog };
     dpfSlotChannel->push("dfmplugin_propertydialog", "slot_CustomView_Register",
                          func, QString(DFMBASE_NAMESPACE::Global::Scheme::kEntry));
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("Cmpt opened"));
 }
 
 void Computer::updateComputerToSidebar()

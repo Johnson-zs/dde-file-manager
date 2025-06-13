@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "../../src/tools/redbox/src/redbox.h"
 #include "pluginmetaobject_p.h"
 #include "pluginmanager_p.h"
 #include "pluginquickmetadata_p.h"
@@ -166,8 +166,8 @@ void PluginManagerPrivate::scanfAllPlugin()
         }
         qCDebug(logDPF) << "PluginManagerPrivate: scanned" << pathScanned << "files in path:" << path;
     }
-    
-    qCInfo(logDPF) << "PluginManagerPrivate: plugin scan completed - total scanned:" << totalScanned 
+
+    qCInfo(logDPF) << "PluginManagerPrivate: plugin scan completed - total scanned:" << totalScanned
                    << "valid plugins:" << validPlugins << "in read queue:" << readQueue.size();
 }
 
@@ -261,7 +261,7 @@ void PluginManagerPrivate::readJsonToMeta(PluginMetaObjectPointer metaObject)
 void PluginManagerPrivate::jsonToMeta(PluginMetaObjectPointer metaObject, const QJsonObject &metaData)
 {
     qCDebug(logDPF) << "PluginManagerPrivate: parsing JSON metadata for plugin:" << metaObject->d->name;
-    
+
     metaObject->d->version = metaData.value(kPluginVersion).toString();
     metaObject->d->category = metaData.value(kPluginCategory).toString();
     metaObject->d->description = metaData.value(kPluginDescription).toString();
@@ -287,7 +287,7 @@ void PluginManagerPrivate::jsonToMeta(PluginMetaObjectPointer metaObject, const 
     // QML 组件信息
     QJsonArray &&quickArray = metaData.value(kQuick).toArray();
     qCDebug(logDPF) << "PluginManagerPrivate: processing" << quickArray.size() << "Quick components for plugin:" << metaObject->d->name;
-    
+
     for (const auto &quickItr : quickArray) {
         const QJsonObject &quick = quickItr.toObject();
 
@@ -330,7 +330,7 @@ void PluginManagerPrivate::jsonToMeta(PluginMetaObjectPointer metaObject, const 
         metaObject->d->quickMetaList.append(quickMeta);
         qCDebug(logDPF) << "PluginManagerPrivate: added Quick component:" << id << "url:" << fullPath;
     }
-    
+
     qCDebug(logDPF) << "PluginManagerPrivate: JSON metadata parsing completed for plugin:" << metaObject->d->name;
 }
 
@@ -341,18 +341,22 @@ bool PluginManagerPrivate::loadPlugins()
 {
     qCInfo(logDPF) << "Start loading all plugins: ";
     dependsSort(&loadQueue, &pluginsToLoad);
+    RB_CHECKTIME_WITH_STARTUP("sort plugins");
 
     bool ret = true;
     for (auto iter = loadQueue.begin(); iter != loadQueue.end();) {
         if (!PluginManagerPrivate::doLoadPlugin(*iter)) {
+            RB_CHECKTIME_WITH_STARTUP("loaded failed" + (*iter)->name().toStdString());
             qCWarning(logDPF) << "Failed to load plugin:" << (*iter)->name() << ", removing from queue";
             iter = loadQueue.erase(iter);   // 移除失败的插件并获取下一个迭代器
             ret = false;
         } else {
+            RB_CHECKTIME_WITH_STARTUP("loaded " + (*iter)->name().toStdString());
             ++iter;   // 加载成功,继续下一个
         }
     }
     qCInfo(logDPF) << "End loading all plugins.";
+    RB_CHECKTIME_WITH_STARTUP("loaded all");
 
     return ret;
 }
@@ -367,11 +371,14 @@ bool PluginManagerPrivate::initPlugins()
     std::for_each(loadQueue.begin(), loadQueue.end(), [&ret, this](PluginMetaObjectPointer pointer) {
         if (!PluginManagerPrivate::doInitPlugin(pointer))
             ret = false;
+        RB_CHECKTIME_WITH_STARTUP("inited " + pointer->name().toStdString());
     });
     qCInfo(logDPF) << "End initialization of all plugins.";
 
+    RB_CHECKTIME_WITH_STARTUP("inited all");
     emit Listener::instance()->pluginsInitialized();
     allPluginsInitialized = true;
+    RB_CHECKTIME_WITH_STARTUP("inited all");
 
     return ret;
 }
@@ -386,12 +393,14 @@ bool PluginManagerPrivate::startPlugins()
     std::for_each(loadQueue.begin(), loadQueue.end(), [&ret, this](PluginMetaObjectPointer pointer) {
         if (!PluginManagerPrivate::doStartPlugin(pointer))
             ret = false;
+        RB_CHECKTIME_WITH_STARTUP("started " + pointer->name().toStdString());
     });
     qCInfo(logDPF) << "End start of all plugins.";
 
+    RB_CHECKTIME_WITH_STARTUP("pluginsStarted");
     emit Listener::instance()->pluginsStarted();
     allPluginsStarted = true;
-
+    RB_CHECKTIME_WITH_STARTUP("pluginsStarted");
     return ret;
 }
 

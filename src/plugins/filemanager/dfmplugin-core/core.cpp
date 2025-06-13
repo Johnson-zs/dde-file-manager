@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "core.h"
 #include "events/coreeventreceiver.h"
 #include "utils/corehelper.h"
@@ -138,6 +138,7 @@ void Core::onAllPluginsStarted()
         dpfSignalDispatcher->publish(DPF_MACRO_TO_STR(DPCORE_NAMESPACE), "signal_StartApp");
     else
         fmInfo() << "Current app name is: " << curAppName << " Don't show filemanger window";
+    RB_CHECKTIME_WITH_STARTUP("core onStarted");
 }
 
 void Core::onWindowOpened(quint64 winid)

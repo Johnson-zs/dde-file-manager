@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "sidebar.h"
 
 #include "sidebarwidget.h"
@@ -66,6 +66,7 @@ void SideBar::onWindowOpened(quint64 windId)
     });
     window->installSideBar(sidebar);
     sidebar->updateItemVisiable(SideBarHelper::hiddenRules());
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("sidebar opened"));
 }
 
 void SideBar::onWindowClosed(quint64 winId)

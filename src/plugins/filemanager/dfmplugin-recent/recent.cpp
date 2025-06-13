@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "recent.h"
 #include "files/recentfileinfo.h"
 #include "files/recentdiriterator.h"
@@ -90,6 +90,8 @@ void Recent::onWindowOpened(quint64 windId)
         regRecentItemToSideBar();
     else
         connect(window, &FileManagerWindow::sideBarInstallFinished, this, &Recent::regRecentItemToSideBar, Qt::DirectConnection);
+
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("recent opened"));
 }
 
 void Recent::updateRecentItemToSideBar()

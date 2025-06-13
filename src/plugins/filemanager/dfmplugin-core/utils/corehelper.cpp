@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "corehelper.h"
 
 #include <dfm-base/base/schemefactory.h>
@@ -175,6 +175,7 @@ bool CoreHelper::eventFilter(QObject *watched, QEvent *event)
 
     if (type == QEvent::Paint) {
         fmDebug() << "Show empty window";
+        RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("FMW paint"));
         window->removeEventFilter(this);
         QMetaObject::invokeMethod(window, "aboutToOpen", Qt::QueuedConnection);
         return ret;

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 - 2023 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-
+#include "tools/redbox/src/redbox.h"
 #include "myshares.h"
 
 #include "utils/shareutils.h"
@@ -94,19 +94,22 @@ void MyShares::onWindowOpened(quint64 winId)
     if (window->sideBar())
         addToSidebar();
     else
-        connect(window, &FileManagerWindow::sideBarInstallFinished, this, [this] { addToSidebar(); }, Qt::DirectConnection);
+        connect(
+                window, &FileManagerWindow::sideBarInstallFinished, this, [this] { addToSidebar(); }, Qt::DirectConnection);
 
     auto searchPlugin { DPF_NAMESPACE::LifeCycle::pluginMetaObj("dfmplugin-search") };
     if (searchPlugin && searchPlugin->pluginState() == DPF_NAMESPACE::PluginMetaObject::kStarted) {
         regMyShareToSearch();
     } else {
-        connect(DPF_NAMESPACE::Listener::instance(), &DPF_NAMESPACE::Listener::pluginStarted, this, [this](const QString &iid, const QString &name) {
-            Q_UNUSED(iid)
-            if (name == "dfmplugin-search")
-                regMyShareToSearch();
-        },
+        connect(
+                DPF_NAMESPACE::Listener::instance(), &DPF_NAMESPACE::Listener::pluginStarted, this, [this](const QString &iid, const QString &name) {
+                    Q_UNUSED(iid)
+                    if (name == "dfmplugin-search")
+                        regMyShareToSearch();
+                },
                 Qt::DirectConnection);
     }
+    RB_JUSTDOFIRST(RB_CHECKTIME_WITH_STARTUP("MyShares opened"));
 }
 
 void MyShares::onShareAdded(const QString &)
