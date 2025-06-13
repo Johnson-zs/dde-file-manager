@@ -12,6 +12,7 @@
 #include <dfm-base/dfm_plugin_defines.h>
 #include <dfm-base/utils/sysinfoutils.h>
 #include <dfm-base/utils/loggerrules.h>
+#include <dfm-base/utils/windowutils.h>
 #include <dfm-base/base/configs/dconfig/dconfigmanager.h>
 
 #include <dfm-framework/dpf.h>
@@ -65,6 +66,11 @@ static constexpr int kTimerInterval { 60 * 1000 };   // 1 min
  */
 static void setEnvForRoot()
 {
+    // 管理员模式可能丢失 QT_QPA_PLATFORM
+    if (DFMBASE_NAMESPACE::WindowUtils::isX11() && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
+        qputenv("QT_QPA_PLATFORM", "dxcb");
+    }
+
     QProcess p1;
     QProcess p2;
 
