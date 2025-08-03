@@ -8,16 +8,15 @@
 #include "dfmplugin_workspace_global.h"
 
 #include <dfm-base/interfaces/fileinfo.h>
-#include <dfm-base/utils/traversaldirthread.h>
 #include <dfm-base/base/application/application.h>
 
 #include <QObject>
-#include <QMultiHash>
+#include <QMap>
 
 namespace dfmplugin_workspace {
 
-class RootInfo;
-class FileItemData;
+class DirectoryManager;
+
 class FileDataManager : public QObject
 {
     Q_OBJECT
@@ -25,18 +24,42 @@ public:
     static FileDataManager *instance();
 
     void initMntedDevsCache();
-    RootInfo *fetchRoot(const QUrl &url);
+    
+    /**
+     * @brief Fetch or create DirectoryManager for the given URL
+     * 
+     * This method provides DirectoryManager instances for directory management,
+     * replacing the old RootInfo-based system with a clean, thread-safe architecture.
+     * 
+     * @param url Directory URL to get manager for
+     * @return DirectoryManager* Manager instance for the URL
+     */
+    DirectoryManager *fetchDirectoryManager(const QUrl &url);
 
-    bool fetchFiles(const QUrl &rootUrl,
-                    const QString &key,
-                    DFMGLOBAL_NAMESPACE::ItemRoles role = DFMGLOBAL_NAMESPACE::kItemFileDisplayNameRole,
-                    Qt::SortOrder order = Qt::AscendingOrder);
-    // self = false, will clean children
-    void cleanRoot(const QUrl &rootUrl, const QString &key, const bool refresh = false, const bool self = true);
-    void cleanRoot(const QUrl &rootUrl);
-    // 清理不再需要的RootInfo对象，保留当前URL和其直接子目录的RootInfo
-    void cleanUnusedRoots(const QUrl &currentUrl, const QString &key);
-    void stopRootWork(const QUrl &rootUrl, const QString &key);
+    /**
+     * @brief Create DirectoryManager for the given URL
+     * 
+     * Creates a new DirectoryManager instance and registers it in the internal map.
+     * 
+     * @param url Directory URL to create manager for
+     * @return DirectoryManager* New manager instance
+     */
+    DirectoryManager *createDirectoryManager(const QUrl &url);
+
+    /**
+     * @brief Clean up DirectoryManager for specific URL
+     * 
+     * @param url Directory URL to clean up
+     */
+    void cleanDirectoryManager(const QUrl &url);
+
+    /**
+     * @brief Set file watcher active state
+     * 
+     * @param rootUrl Directory root URL
+     * @param childUrl Child file URL
+     * @param active Whether to activate watching
+     */
     void setFileActive(const QUrl &rootUrl, const QUrl &childUrl, bool active);
 
 public Q_SLOTS:
@@ -47,19 +70,15 @@ private:
     explicit FileDataManager(QObject *parent = nullptr);
     ~FileDataManager();
 
-    RootInfo *createRoot(const QUrl &url);
     bool checkNeedCache(const QUrl &url);
-    void handleDeletion(RootInfo *root);
 
-    QMap<QUrl, RootInfo *> rootInfoMap {};
-    QMap<QUrl, TraversalThreadPointer> traversalPointerMap {};
+    // New architecture: DirectoryManager mapping
+    QMap<QUrl, DirectoryManager *> directoryManagerMap {};
 
     bool isMixFileAndFolder { false };
 
     // scheme in cacheDataSchemes will have cache
     QList<QString> cacheDataSchemes {};
-    QMap<QUrl, int> dataRefMap {};
-    QList<RootInfo *> deleteLaterList {};
 };
 
 }

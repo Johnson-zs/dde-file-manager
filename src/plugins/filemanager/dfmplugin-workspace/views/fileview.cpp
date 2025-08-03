@@ -578,7 +578,7 @@ void FileView::viewModeChanged(quint64 windowId, int viewMode)
 {
     Global::ViewMode mode = static_cast<Global::ViewMode>(viewMode);
     if (currentViewMode() == mode) {
-        qWarning() << "Current view mode equal to the new view mode that switched by global event. Don't need to do anything.";
+        fmWarning() << "Current view mode equal to the new view mode that switched by global event. Don't need to do anything.";
         return;
     }
 

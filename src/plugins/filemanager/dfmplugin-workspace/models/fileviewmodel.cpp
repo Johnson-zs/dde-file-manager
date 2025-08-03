@@ -8,8 +8,9 @@
 #include "utils/fileoperatorhelper.h"
 #include "utils/filedatamanager.h"
 #include "utils/filesortworker.h"
-#include "models/rootinfo.h"
+// #include "models/rootinfo.h"  // Deprecated - replaced by DirectoryManager
 #include "models/fileitemdata.h"
+#include "managers/directorymanager.h"
 #include "events/workspaceeventsequence.h"
 #include "events/workspaceeventcaller.h"
 
@@ -83,7 +84,7 @@ FileViewModel::~FileViewModel()
         delete itemRootData;
         itemRootData = nullptr;
     }
-    FileDataManager::instance()->cleanRoot(dirRootUrl, currentKey);
+    FileDataManager::instance()->cleanDirectoryManager(dirRootUrl);
     fmInfo() << "FileViewModel destructor completed for key:" << currentKey;
 }
 
@@ -179,7 +180,7 @@ QModelIndex FileViewModel::setRootUrl(const QUrl &url)
 
     // create root by url
     dirRootUrl = url;
-    FileDataManager::instance()->fetchRoot(dirRootUrl);
+    FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
     endResetModel();
 
     initFilterSortWork();
@@ -223,22 +224,8 @@ void FileViewModel::doExpand(const QModelIndex &index)
     const QUrl &url = index.data(kItemUrlRole).toUrl();
     fmInfo() << "Expanding item:" << url.toString();
 
-    RootInfo *expandRoot = FileDataManager::instance()->fetchRoot(url);
-
-    connect(
-            expandRoot, &RootInfo::requestCloseTab, this, [](const QUrl &url) { WorkspaceHelper::instance()->closeTab(url); }, Qt::QueuedConnection);
-    connect(filterSortWorker.data(), &FileSortWorker::getSourceData, expandRoot, &RootInfo::handleGetSourceData, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::sourceDatas, filterSortWorker.data(), &FileSortWorker::handleSourceChildren, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::iteratorLocalFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorLocalChildren, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::iteratorAddFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorChildren, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::iteratorUpdateFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorChildrenUpdate, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::watcherAddFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherAddChildren, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::watcherRemoveFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherRemoveChildren, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::watcherUpdateFile, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateFile, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::watcherUpdateFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateFiles, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::watcherUpdateHideFile, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateHideFile, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::traversalFinished, filterSortWorker.data(), &FileSortWorker::handleTraversalFinish, Qt::QueuedConnection);
-    connect(expandRoot, &RootInfo::requestSort, filterSortWorker.data(), &FileSortWorker::handleSortDir, Qt::QueuedConnection);
+    DirectoryManager *expandManager = FileDataManager::instance()->fetchDirectoryManager(url);
+    connectDirectoryManager(expandManager);
 
     canFetchFiles = true;
     fetchingUrl = url;
@@ -264,7 +251,7 @@ void FileViewModel::doCollapse(const QModelIndex &index)
     FileItemDataPointer item = filterSortWorker->childData(index.row());
     if (item && item->data(Global::ItemRoles::kItemTreeViewExpandedRole).toBool()) {
         item->setExpanded(false);
-        FileDataManager::instance()->cleanRoot(collapseUrl, currentKey);
+        FileDataManager::instance()->cleanDirectoryManager(collapseUrl);
         Q_EMIT dataChanged(index, index);
     }
 }
@@ -428,7 +415,9 @@ QVariant FileViewModel::headerData(int column, Qt::Orientation, int role) const
 void FileViewModel::refresh()
 {
     fmInfo() << "Refreshing view for URL:" << dirRootUrl.toString();
-    FileDataManager::instance()->cleanRoot(dirRootUrl, currentKey, true);
+    // Refresh directory by cleaning and re-requesting
+    FileDataManager::instance()->cleanDirectoryManager(dirRootUrl);
+    FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
 
     Q_EMIT requestRefreshAllChildren();
 }
@@ -459,21 +448,24 @@ void FileViewModel::fetchMore(const QModelIndex &parent)
 
     fmDebug() << "Starting to fetch files for URL:" << fetchingUrl.toString();
 
-    if (filterSortWorker.isNull()) {
-        fmDebug() << "Using direct fetch mode for URL:" << fetchingUrl.toString();
-        ret = FileDataManager::instance()->fetchFiles(fetchingUrl, currentKey);
-    } else {
-        fmDebug() << "Using filter sort worker fetch mode for URL:" << fetchingUrl.toString();
-        ret = FileDataManager::instance()->fetchFiles(fetchingUrl,
-                                                      currentKey,
-                                                      filterSortWorker->getSortRole(),
-                                                      filterSortWorker->getSortOrder());
-    }
-
-    if (ret) {
-        fmDebug() << "File fetch request sent successfully for URL:" << fetchingUrl.toString();
+    // Get DirectoryManager and request data
+    DirectoryManager *manager = FileDataManager::instance()->fetchDirectoryManager(fetchingUrl);
+    if (manager) {
+        SortConfig sortConfig;
+        FilterConfig filterConfig;
+        
+        if (!filterSortWorker.isNull()) {
+            sortConfig.role = filterSortWorker->getSortRole();
+            sortConfig.order = filterSortWorker->getSortOrder();
+            sortConfig.isMixDirAndFile = Application::instance()->appAttribute(Application::kFileAndDirMixedSort).toBool();
+        }
+        
+        QString requestId = manager->requestDirectoryData(fetchingUrl, sortConfig, filterConfig, true);
+        fmDebug() << "Directory data request sent with ID:" << requestId;
+        
         changeState(ModelState::kBusy);
         startCursorTimer();
+        ret = true;
     } else {
         fmWarning() << "Failed to fetch files for URL:" << fetchingUrl.toString() << "currentKey:" << currentKey;
     }
@@ -645,14 +637,14 @@ void FileViewModel::stopTraversWork(const QUrl &newUrl)
     if (dirLoadStrategy == DirectoryLoadStrategy::kPreserve && canUsePreserveStrategy) {
         fmDebug() << "Using preserve strategy to stop work";
         // stop work but do not clean current data
-        FileDataManager::instance()->stopRootWork(dirRootUrl, currentKey);
-        FileDataManager::instance()->cleanUnusedRoots(dirRootUrl, currentKey);
+        // In new architecture, DirectoryManager handles cleanup automatically
+        fmDebug() << "Stopping traversal work for URL:" << dirRootUrl.toString();
         return;
     }
 
     fmDebug() << "Cleaning all data due to strategy or scheme change";
     discardFilterSortObjects();
-    FileDataManager::instance()->cleanRoot(dirRootUrl, currentKey);
+    FileDataManager::instance()->cleanDirectoryManager(dirRootUrl);
 }
 
 QList<ItemRoles> FileViewModel::getColumnRoles() const
@@ -846,9 +838,9 @@ void FileViewModel::setTreeView(const bool isTree)
 
 QStringList FileViewModel::getKeyWords()
 {
-    auto rootInfo = FileDataManager::instance()->fetchRoot(dirRootUrl);
-    if (rootInfo)
-        return rootInfo->getKeyWords();
+    auto directoryManager = FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
+    if (directoryManager)
+        return directoryManager->getSearchKeywords(dirRootUrl);
 
     return {};
 }
@@ -913,12 +905,11 @@ void FileViewModel::executeLoad()
         // 更新当前URL（但不影响视图显示）
         dirRootUrl = urlToLoad;
 
-        // 获取目标URL的RootInfo，准备数据获取
-        RootInfo *newRoot = FileDataManager::instance()->fetchRoot(dirRootUrl);
-        newRoot->setFirstBatch(true);
+        // 获取目标URL的DirectoryManager，准备数据获取
+        DirectoryManager *directoryManager = FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
 
-        // 连接信号，使当前filterSortWorker监听新RootInfo的数据
-        connectRootAndFilterSortWork(newRoot, true);
+        // 连接信号，使当前filterSortWorker监听DirectoryManager的数据
+        connectDirectoryManager(directoryManager, true);
 
         // 更新状态为获取中
         changeState(ModelState::kBusy);
@@ -1056,7 +1047,8 @@ void FileViewModel::onWorkFinish(int visiableCount, int totalCount)
     if (dirLoadStrategy == DirectoryLoadStrategy::kPreserve) {
         fmDebug() << "Cleaning unused roots after preserve strategy completion for URL:" << dirRootUrl.toString();
         // 获取当前URL所有子目录的RootInfo
-        FileDataManager::instance()->cleanUnusedRoots(dirRootUrl, currentKey);
+        // In new architecture, DirectoryManager handles cleanup automatically
+        fmDebug() << "Work finished, cleanup handled by DirectoryManager";
     }
 }
 
@@ -1068,41 +1060,63 @@ void FileViewModel::onDataChanged(int first, int last)
     Q_EMIT dataChanged(firstIndex, lastIndex);
 }
 
-void FileViewModel::connectRootAndFilterSortWork(RootInfo *root, const bool refresh)
+// Deprecated method removed - replaced by connectDirectoryManager
+
+void FileViewModel::connectDirectoryManager(DirectoryManager *directoryManager, const bool refresh)
 {
     if (filterSortWorker.isNull()) {
-        fmWarning() << "Cannot connect root and filter sort work: filter sort worker is null";
+        fmWarning() << "Cannot connect directory manager: filter sort worker is null";
         return;
     }
 
-    if (refresh) {
-        auto token = QString::number(quintptr(filterSortWorker.data()), 16);
-        if (root->connectTokens().contains(token)) {
-            fmDebug() << "Root already connected with token:" << token;
-            return;
-        }
-        root->addConnectToken(token);
-        fmDebug() << "Added connection token:" << token << "for root URL:" << rootUrl();
+    if (!directoryManager) {
+        fmWarning() << "Cannot connect null directory manager";
+        return;
     }
 
-    connect(
-            root, &RootInfo::requestCloseTab, this, [](const QUrl &url) { WorkspaceHelper::instance()->closeTab(url); }, Qt::QueuedConnection);
-    connect(filterSortWorker.data(), &FileSortWorker::getSourceData, root, &RootInfo::handleGetSourceData, Qt::QueuedConnection);
-    connect(root, &RootInfo::sourceDatas, filterSortWorker.data(), &FileSortWorker::handleSourceChildren, Qt::QueuedConnection);
-    connect(root, &RootInfo::iteratorLocalFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorLocalChildren, Qt::QueuedConnection);
-    connect(root, &RootInfo::iteratorAddFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorChildren, Qt::QueuedConnection);
-    connect(root, &RootInfo::iteratorUpdateFiles, filterSortWorker.data(), &FileSortWorker::handleIteratorChildrenUpdate, Qt::QueuedConnection);
-    connect(root, &RootInfo::watcherAddFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherAddChildren, Qt::QueuedConnection);
-    connect(root, &RootInfo::watcherRemoveFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherRemoveChildren, Qt::QueuedConnection);
-    connect(root, &RootInfo::watcherUpdateFile, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateFile, Qt::QueuedConnection);
-    connect(root, &RootInfo::watcherUpdateFiles, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateFiles, Qt::QueuedConnection);
-    connect(root, &RootInfo::watcherUpdateHideFile, filterSortWorker.data(), &FileSortWorker::handleWatcherUpdateHideFile, Qt::QueuedConnection);
-    connect(root, &RootInfo::traversalFinished, filterSortWorker.data(), &FileSortWorker::handleTraversalFinish, Qt::QueuedConnection);
-    connect(root, &RootInfo::requestSort, filterSortWorker.data(), &FileSortWorker::handleSortDir, Qt::QueuedConnection);
+    fmDebug() << "Connecting DirectoryManager to FileSortWorker for URL:" << rootUrl()
+              << "Refresh:" << refresh;
 
-    connect(root, &RootInfo::renameFileProcessStarted, this, &FileViewModel::renameFileProcessStarted);
+    // Connect the 3 unified signals from DirectoryManager to FileSortWorker
+    // This replaces the 13 complex signal connections to RootInfo
+    
+    // 1. Directory data ready - replaces sourceDatas + iteratorLocalFiles + iteratorAddFiles
+    connect(directoryManager, &DirectoryManager::directoryDataReady,
+            filterSortWorker.data(), &FileSortWorker::handleDirectoryDataReady, 
+            Qt::QueuedConnection);
+    
+    // 2. Directory data updated - replaces watcherAddFiles + watcherRemoveFiles + watcherUpdateFiles
+    connect(directoryManager, &DirectoryManager::directoryDataUpdated,
+            filterSortWorker.data(), &FileSortWorker::handleDirectoryDataUpdated, 
+            Qt::QueuedConnection);
+    
+    // 3. Request error - replaces various error signals from RootInfo
+    connect(directoryManager, &DirectoryManager::requestError,
+            filterSortWorker.data(), &FileSortWorker::handleRequestError, 
+            Qt::QueuedConnection);
+    
+    // 4. Request cached data - replaces getSourceData mechanism
+    connect(filterSortWorker.data(), &FileSortWorker::requestCachedDirectoryData,
+            directoryManager, [directoryManager](const QUrl &directoryUrl) {
+                // Request cached data using default sort/filter configuration
+                SortConfig defaultSort;
+                FilterConfig defaultFilter;
+                directoryManager->requestDirectoryData(directoryUrl, defaultSort, defaultFilter, true);
+            }, Qt::QueuedConnection);
 
-    fmDebug() << "Root and filter sort work connected successfully for URL:" << rootUrl();
+    // If refresh is requested, immediately request directory data
+    if (refresh && dirRootUrl.isValid()) {
+        SortConfig sortConfig;
+        FilterConfig filterConfig;
+        
+        // Configure sort settings based on current view state
+        // This would need to be populated from the current view configuration
+        
+        fmDebug() << "Requesting directory data for refresh:" << dirRootUrl.toString();
+        directoryManager->requestDirectoryData(dirRootUrl, sortConfig, filterConfig, false);
+    }
+
+    fmDebug() << "DirectoryManager connected successfully to FileSortWorker for URL:" << rootUrl();
 }
 
 void FileViewModel::initFilterSortWork()
@@ -1150,8 +1164,8 @@ void FileViewModel::initFilterSortWork()
     // 连接信号
     connectFilterSortWorkSignals();
 
-    RootInfo *root = FileDataManager::instance()->fetchRoot(dirRootUrl);
-    connectRootAndFilterSortWork(root);
+    DirectoryManager *directoryManager = FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
+    connectDirectoryManager(directoryManager);
 
     filterSortThread->start();
     fmInfo() << "Filter sort work initialized and started for URL:" << dirRootUrl.toString();
@@ -1247,8 +1261,8 @@ void FileViewModel::connectFilterSortWorkSignals()
             filterSortWorker.data(), &FileSortWorker::requestFetchMore, this, [this]() {
         canFetchFiles = true;
         fetchingUrl = rootUrl();
-        RootInfo *root = FileDataManager::instance()->fetchRoot(dirRootUrl);
-        connectRootAndFilterSortWork(root, true);
+        DirectoryManager *directoryManager = FileDataManager::instance()->fetchDirectoryManager(dirRootUrl);
+        connectDirectoryManager(directoryManager, true);
         fetchMore(rootIndex()); }, Qt::QueuedConnection);
     connect(filterSortWorker.data(), &FileSortWorker::updateRow, this, &FileViewModel::onFileUpdated, Qt::QueuedConnection);
     connect(filterSortWorker.data(), &FileSortWorker::selectAndEditFile, this, &FileViewModel::selectAndEditFile, Qt::QueuedConnection);

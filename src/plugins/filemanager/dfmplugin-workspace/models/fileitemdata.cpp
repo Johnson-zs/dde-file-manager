@@ -137,7 +137,7 @@ QVariant FileItemData::data(int role) const
             lastModified = QDateTime::fromSecsSinceEpoch(sortInfo->lastModifiedTime());
         }
         if (info) {
-            auto lastModified = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
+            lastModified = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
         }
         return lastModified.isValid() ? lastModified.toString(FileUtils::dateTimeFormat()) : "-";
     }

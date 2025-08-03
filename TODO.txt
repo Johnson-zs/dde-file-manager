@@ -1,0 +1,12 @@
+- recent、mtp、trash、tag等验证
+- 搜索卡死
+- 搜索preserve 模式验证
+- tree（排序、监视器）
+- 10w文件切换性能、内存性能
+- sortinfo转换重复的性能问题
+- cache功能验证
+- sortworker重构
+- 排序（回收站顺序丢失）
+- 删除目录跳转失败
+- 隐藏文件再出现时，文件顺序错误
+- 批量文件变化测试，如apt source

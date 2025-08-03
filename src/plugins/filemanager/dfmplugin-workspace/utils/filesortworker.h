@@ -7,6 +7,8 @@
 
 #include "dfmplugin_workspace_global.h"
 #include "models/fileitemdata.h"
+#include "data/directorydata.h"
+#include "data/filechange.h"
 #include <dfm-base/dfm_global_defines.h>
 #include <dfm-base/interfaces/fileinfo.h>
 #include <dfm-base/interfaces/abstractsortfilter.h>
@@ -145,6 +147,50 @@ public slots:
     // 如果不是tree视图，切换到tree视图，就去执行处理dir是否可以展开属性设置
     // 如果是tree视图，切换到普通试图，去掉所有子目录，去掉所有的是否可以展开属性
     void handleSwitchTreeView(const bool isTree);
+
+    /**
+     * @brief Handle unified directory data ready signal from DirectoryManager
+     * 
+     * This method replaces the complex signal connections to RootInfo and provides
+     * a unified interface for receiving complete directory data.
+     * 
+     * @param requestId Request ID that generated this data
+     * @param data Complete directory data including files and configuration
+     */
+    void handleDirectoryDataReady(const QString &requestId, const DirectoryData &data);
+
+    /**
+     * @brief Handle unified directory data updated signal from DirectoryManager
+     * 
+     * This method processes file system changes and applies them to the current
+     * view, replacing the individual watcher signals.
+     * 
+     * @param directoryUrl Directory URL that was updated
+     * @param changes List of file changes that occurred
+     */
+    void handleDirectoryDataUpdated(const QUrl &directoryUrl, const QList<FileChange> &changes);
+
+    /**
+     * @brief Handle request error from DirectoryManager
+     * 
+     * This method handles all types of errors that can occur during directory
+     * operations, replacing various error signals from RootInfo.
+     * 
+     * @param requestId Request ID that encountered the error
+     * @param errorMessage Descriptive error message
+     */
+    void handleRequestError(const QString &requestId, const QString &errorMessage);
+
+signals:
+    /**
+     * @brief Request cached directory data from DirectoryManager
+     * 
+     * This signal replaces the getSourceData mechanism and requests cached
+     * directory data for the current view.
+     * 
+     * @param directoryUrl Directory URL to get cached data for
+     */
+    void requestCachedDirectoryData(const QUrl &directoryUrl);
 
 private:
     void handleAddChildren(const QString &key,

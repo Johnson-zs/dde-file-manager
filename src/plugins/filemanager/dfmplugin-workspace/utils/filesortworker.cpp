@@ -2031,3 +2031,155 @@ void FileSortWorker::doCompleteFileInfo(SortInfoPointer sortInfo)
     // 标记所有信息已完成
     sortInfo->setInfoCompleted(true);
 }
+
+void FileSortWorker::handleDirectoryDataReady(const QString &requestId, const DirectoryData &data)
+{
+    fmDebug() << "FileSortWorker received directory data ready for request:" << requestId
+              << "URL:" << data.directoryUrl().toString() << "Files:" << data.fileCount();
+
+    // Convert DirectoryData to the format expected by existing logic
+    if (data.directoryUrl() != current) {
+        fmWarning() << "Received data for different directory:" << data.directoryUrl() 
+                    << "Expected:" << current;
+        return;
+    }
+
+    // Create SortInfoPointer list from FileItem list
+    QList<SortInfoPointer> sortInfoList = data.createSortInfoList();
+    
+    // Determine sort parameters from DirectoryData
+    DFMIO::DEnumerator::SortRoleCompareFlag sortRole = DFMIO::DEnumerator::SortRoleCompareFlag::kSortRoleCompareDefault;
+    Qt::SortOrder sortOrder = data.sortConfig().order;
+    bool isMixDirAndFile = data.sortConfig().isMixDirAndFile;
+    
+    // Convert sort role from Global::ItemRoles to DEnumerator flag
+    switch (data.sortConfig().role) {
+        case Global::ItemRoles::kItemFileDisplayNameRole:
+            sortRole = DFMIO::DEnumerator::SortRoleCompareFlag::kSortRoleCompareFileName;
+            break;
+        case Global::ItemRoles::kItemFileSizeRole:
+            sortRole = DFMIO::DEnumerator::SortRoleCompareFlag::kSortRoleCompareFileSize;
+            break;
+        case Global::ItemRoles::kItemFileLastModifiedRole:
+            sortRole = DFMIO::DEnumerator::SortRoleCompareFlag::kSortRoleCompareFileLastModified;
+            break;
+        default:
+            sortRole = DFMIO::DEnumerator::SortRoleCompareFlag::kSortRoleCompareDefault;
+            break;
+    }
+
+    // Use existing handleSourceChildren method to process the data
+    // This preserves all existing business logic for sorting and filtering
+    // Use currentKey instead of requestId to match FileSortWorker's key
+    handleSourceChildren(currentKey, sortInfoList, sortRole, sortOrder, isMixDirAndFile, true);
+    
+    fmDebug() << "FileSortWorker completed processing directory data for request:" << requestId;
+}
+
+void FileSortWorker::handleDirectoryDataUpdated(const QUrl &directoryUrl, const QList<FileChange> &changes)
+{
+    fmDebug() << "FileSortWorker received directory data updated for:" << directoryUrl.toString()
+              << "Changes:" << changes.size();
+
+    if (directoryUrl != current) {
+        fmDebug() << "Ignoring changes for different directory:" << directoryUrl;
+        return;
+    }
+
+    // Group changes by type for efficient processing
+    QList<SortInfoPointer> addedFiles;
+    QList<SortInfoPointer> removedFiles;
+    QList<SortInfoPointer> modifiedFiles;
+
+    for (const auto &change : changes) {
+        switch (change.changeType()) {
+            case FileChange::ChangeType::Created: {
+                // Create SortInfoPointer for new file
+                auto fileInfo = InfoFactory::create<FileInfo>(change.fileUrl());
+                if (fileInfo) {
+                    auto sortInfo = SortInfoPointer(new SortFileInfo);
+                    sortInfo->setUrl(change.fileUrl());
+                    // Initialize basic properties - detailed info will be loaded later
+                    sortInfo->setSize(fileInfo->size());
+                    sortInfo->setDir(fileInfo->isAttributes(OptInfoType::kIsDir));
+                    sortInfo->setHide(fileInfo->isAttributes(OptInfoType::kIsHidden));
+                    addedFiles.append(sortInfo);
+                }
+                break;
+            }
+            case FileChange::ChangeType::Deleted: {
+                // Create minimal SortInfoPointer for removal
+                auto sortInfo = SortInfoPointer(new SortFileInfo);
+                sortInfo->setUrl(change.fileUrl());
+                removedFiles.append(sortInfo);
+                break;
+            }
+            case FileChange::ChangeType::Modified: {
+                // Create SortInfoPointer for modified file
+                auto fileInfo = InfoFactory::create<FileInfo>(change.fileUrl());
+                if (fileInfo) {
+                    auto sortInfo = SortInfoPointer(new SortFileInfo);
+                    sortInfo->setUrl(change.fileUrl());
+                    sortInfo->setSize(fileInfo->size());
+                    sortInfo->setDir(fileInfo->isAttributes(OptInfoType::kIsDir));
+                    sortInfo->setHide(fileInfo->isAttributes(OptInfoType::kIsHidden));
+                    modifiedFiles.append(sortInfo);
+                }
+                break;
+            }
+            case FileChange::ChangeType::Moved: {
+                // Handle move as remove old + add new
+                if (!change.oldUrl().isEmpty()) {
+                    auto oldSortInfo = SortInfoPointer(new SortFileInfo);
+                    oldSortInfo->setUrl(change.oldUrl());
+                    removedFiles.append(oldSortInfo);
+                }
+                
+                auto fileInfo = InfoFactory::create<FileInfo>(change.fileUrl());
+                if (fileInfo) {
+                    auto newSortInfo = SortInfoPointer(new SortFileInfo);
+                    newSortInfo->setUrl(change.fileUrl());
+                    newSortInfo->setSize(fileInfo->size());
+                    newSortInfo->setDir(fileInfo->isAttributes(OptInfoType::kIsDir));
+                    newSortInfo->setHide(fileInfo->isAttributes(OptInfoType::kIsHidden));
+                    addedFiles.append(newSortInfo);
+                }
+                break;
+            }
+        }
+    }
+
+    // Apply changes using existing watcher methods
+    // This preserves all existing business logic for file updates
+    if (!removedFiles.isEmpty()) {
+        handleWatcherRemoveChildren(removedFiles);
+    }
+    
+    if (!modifiedFiles.isEmpty()) {
+        handleWatcherUpdateFiles(modifiedFiles);
+    }
+    
+    if (!addedFiles.isEmpty()) {
+        handleWatcherAddChildren(addedFiles);
+    }
+    
+    fmDebug() << "FileSortWorker completed processing directory updates for:" << directoryUrl.toString()
+              << "Added:" << addedFiles.size() << "Removed:" << removedFiles.size() 
+              << "Modified:" << modifiedFiles.size();
+}
+
+void FileSortWorker::handleRequestError(const QString &requestId, const QString &errorMessage)
+{
+    fmWarning() << "FileSortWorker received request error for:" << requestId 
+                << "Error:" << errorMessage;
+
+    // For now, we don't have specific error handling in the original FileSortWorker
+    // This could be extended in the future to show error messages to the user
+    // or trigger retry mechanisms
+    
+    // Emit signals to notify the view that something went wrong
+    emit requestSetIdel(0, 0);  // Set idle state
+    emit reqUestCloseCursor();  // Close any waiting cursor
+    
+    fmDebug() << "FileSortWorker completed error handling for request:" << requestId;
+}

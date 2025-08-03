@@ -28,7 +28,7 @@ namespace dfmplugin_workspace {
 class FileView;
 class FileItemData;
 class FileSortWorker;
-class RootInfo;
+class DirectoryManager;
 class FileViewModel : public QAbstractItemModel
 {
     Q_OBJECT
@@ -148,7 +148,18 @@ public Q_SLOTS:
     void onDataChanged(int first, int last);
 
 private:
-    void connectRootAndFilterSortWork(RootInfo *root, const bool refresh = false);
+    /**
+     * @brief Connect DirectoryManager to FileSortWorker with unified signals
+     * 
+     * This method replaces the complex 13-signal connections to RootInfo with
+     * simplified 4-signal connections to DirectoryManager, providing a cleaner
+     * and more maintainable interface.
+     * 
+     * @param directoryManager Directory manager instance to connect
+     * @param refresh Whether to refresh the directory data
+     */
+    void connectDirectoryManager(DirectoryManager *directoryManager, const bool refresh = false);
+    
     void connectFilterSortWorkSignals();
     void initFilterSortWork();
     void quitFilterSortWork();
