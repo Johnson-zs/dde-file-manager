@@ -186,14 +186,14 @@ GroupingEngine::GroupingResult GroupingEngine::performGrouping(const QList<FileI
                 continue;   // Skip null pointers
             }
 
-            // Convert FileItemDataPointer to FileInfoPointer for strategy interface
-            FileInfoPointer fileInfo = file->fileInfo();
-            if (!fileInfo) {
-                fmWarning() << "GroupingEngine: Invalid file info for" << file->data(DFMBASE_NAMESPACE::Global::kItemUrlRole).toUrl();
-                continue;
-            }
+            // // Convert FileItemDataPointer to FileInfoPointer for strategy interface
+            // FileInfoPointer fileInfo = file->fileInfo();
+            // if (!fileInfo) {
+            //     fmWarning() << "GroupingEngine: Invalid file info for" << file->data(DFMBASE_NAMESPACE::Global::kItemUrlRole).toUrl();
+            //     continue;
+            // }
 
-            QString groupKey = strategy->getGroupKey(fileInfo);
+            QString groupKey = strategy->getGroupKey(QVariant::fromValue(file));
             if (groupKey.isEmpty()) {
                 fmWarning() << "GroupingEngine: Empty group key for file" << file->data(DFMBASE_NAMESPACE::Global::kItemUrlRole).toUrl();
                 continue;

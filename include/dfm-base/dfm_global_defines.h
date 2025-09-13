@@ -115,6 +115,9 @@ enum ItemRoles {
     kItemFileContentPreviewRole = Qt::UserRole + 38,   // item file content
     kItemIsGroupHeaderType = Qt::UserRole + 39,
     kItemGroupHeaderKey = Qt::UserRole + 40,
+    kItemFileLastModifiedDateRole = Qt::UserRole + 41, // item file last modidfied DateTime
+    kItemFileCreatedDateRole = Qt::UserRole + 42, // item file create DateTime
+    kItemFileMimeTypeNameRole = Qt::UserRole + 43, // item file mimetype name
     kItemUnknowRole = Qt::UserRole + 999
 };
 

@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "namegroupstrategy.h"
+#include "models/fileitemdata.h"
 
 #include <dfm-base/dfm_log_defines.h>
-#include <dfm-base/interfaces/fileinfo.h>
 #include <dfm-base/utils/chinese2pinyin.h>
 
 #include <QDebug>
@@ -52,23 +52,30 @@ NameGroupStrategy::~NameGroupStrategy()
     fmDebug() << "NameGroupStrategy: Destroyed";
 }
 
-QString NameGroupStrategy::getGroupKey(const FileInfoPointer &info) const
+QString NameGroupStrategy::getGroupKey(const QVariant &info) const
 {
-    if (!info) {
-        fmWarning() << "NameGroupStrategy: Invalid fileInfo";
-        return "others";
+    if (!info.isValid()) {
+        fmWarning() << "SizeGroupStrategy: Invalid variant";
+        return "unknown";
     }
 
-    QString name = info->displayOf(DisPlayInfoType::kFileDisplayName);
+    auto itemData = info.value<FileItemDataPointer>();
+    if (!itemData) {
+        fmWarning() << "SizeGroupStrategy: Invalid file item data pointer!!";
+        return "unknown";
+    }
+
+    // --TODO 需要注意desktop的显示名称处理（第一次迭代出来时，desktop没有处理显示名称）
+    QString name = itemData->data(Global::ItemRoles::kItemDisplayRole).toString();
 
     if (name.isEmpty()) {
-        fmWarning() << "NameGroupStrategy: Empty file name for" << info->urlOf(UrlInfoType::kUrl).toString();
+        fmWarning() << "NameGroupStrategy: Empty file name for" << itemData->data(Global::ItemRoles::kItemUrlRole).toString();
         return "others";
     }
 
     QString groupKey = classifyFirstCharacter(name.at(0));
 
-    fmDebug() << "NameGroupStrategy: File" << info->urlOf(UrlInfoType::kUrl).toString()
+    fmDebug() << "NameGroupStrategy: File" << itemData->data(Global::ItemRoles::kItemUrlRole).toString()
               << "name:" << name << "first char:" << name.at(0) << "-> group:" << groupKey;
 
     return groupKey;

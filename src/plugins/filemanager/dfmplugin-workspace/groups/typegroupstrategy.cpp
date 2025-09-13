@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "typegroupstrategy.h"
+#include "models/fileitemdata.h"
 
 #include <dfm-base/dfm_log_defines.h>
 #include <dfm-base/base/schemefactory.h>
 #include <dfm-base/interfaces/fileinfo.h>
+#include <dfm-base/mimetype/dmimedatabase.h>
 
 #include <QDebug>
 
@@ -54,28 +56,36 @@ TypeGroupStrategy::~TypeGroupStrategy()
     fmDebug() << "TypeGroupStrategy: Destroyed";
 }
 
-QString TypeGroupStrategy::getGroupKey(const FileInfoPointer &info) const
+QString TypeGroupStrategy::getGroupKey(const QVariant &info) const
 {
-    if (!info) {
-        fmWarning() << "TypeGroupStrategy: Invalid fileInfo";
+    if (!info.isValid()) {
+        fmWarning() << "SizeGroupStrategy: Invalid variant";
+        return "unknown";
+    }
+
+    auto itemData = info.value<FileItemDataPointer>();
+    if (!itemData) {
+        fmWarning() << "SizeGroupStrategy: Invalid file item data pointer!!";
         return "unknown";
     }
 
     // Check if it's a directory first
-    if (info->isAttributes(OptInfoType::kIsDir)) {
+    if (itemData->data(Global::ItemRoles::kItemFileIsDirRole).toBool()) {
         return "directory";
     }
 
     // Get MIME type and map to group
-    QString mimeType = info->nameOf(NameInfoType::kMimeTypeName);
+    QString mimeType = itemData->data(Global::ItemRoles::kItemFileMimeTypeNameRole).toString();
     if (mimeType.isEmpty()) {
         // Fallback: try to get MIME type from file extension
-        mimeType = info->fileMimeType().name();
+        // 文件非常多或者远程协议设备文件，这里存在效率问题，需要考虑优化
+        static dfmbase::DMimeDatabase *db = new dfmbase::DMimeDatabase;
+        mimeType = db->mimeTypeForUrl(itemData->data(Global::ItemRoles::kItemUrlRole).toUrl()).name();
     }
 
     QString groupKey = mapMimeTypeToGroup(mimeType);
 
-    fmDebug() << "TypeGroupStrategy: File" << info->urlOf(UrlInfoType::kUrl).toString()
+    fmDebug() << "TypeGroupStrategy: File" << itemData->data(Global::ItemRoles::kItemUrlRole).toString()
               << "MIME type:" << mimeType << "-> group:" << groupKey;
 
     return groupKey;

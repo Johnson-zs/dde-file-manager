@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sizegroupstrategy.h"
+#include "models/fileitemdata.h"
 
 #include <dfm-base/dfm_log_defines.h>
 #include <dfm-base/interfaces/fileinfo.h>
@@ -51,23 +52,31 @@ SizeGroupStrategy::~SizeGroupStrategy()
     fmDebug() << "SizeGroupStrategy: Destroyed";
 }
 
-QString SizeGroupStrategy::getGroupKey(const FileInfoPointer &info) const
+QString SizeGroupStrategy::getGroupKey(const QVariant &info) const
 {
-    if (!info) {
-        fmWarning() << "SizeGroupStrategy: Invalid fileInfo";
+    if (!info.isValid()) {
+        fmWarning() << "SizeGroupStrategy: Invalid variant";
         return "unknown";
     }
 
+    auto itemData = info.value<FileItemDataPointer>();
+    if (!itemData) {
+        fmWarning() << "SizeGroupStrategy: Invalid file item data pointer!!";
+        return "unknown";
+    }
+
+    auto isDir = itemData->data(Global::ItemRoles::kItemFileIsDirRole).toBool();
+
     // Check if it's a directory - directories have unknown size
-    if (info->isAttributes(OptInfoType::kIsDir)) {
+    if (isDir) {
         return "unknown";
     }
 
     // Get file size and classify
-    qint64 size = info->size();
+    qint64 size = itemData->data(Global::ItemRoles::kItemFileSizeIntRole).toLongLong();
     QString groupKey = classifyBySize(size);
 
-    fmDebug() << "SizeGroupStrategy: File" << info->urlOf(UrlInfoType::kUrl).toString()
+    fmDebug() << "SizeGroupStrategy: File" << itemData->data(Global::ItemRoles::kItemUnknowRole).toString()
               << "size:" << size << "bytes -> group:" << groupKey;
 
     return groupKey;

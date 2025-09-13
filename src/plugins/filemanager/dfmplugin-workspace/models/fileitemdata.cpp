@@ -133,12 +133,12 @@ QVariant FileItemData::data(int role) const
         return url.path();
     case kItemFileLastModifiedRole: {
         QDateTime lastModified;
-        if (sortInfo && sortInfo->isInfoCompleted()) {
+        if (sortInfo && sortInfo->isInfoCompleted())
             lastModified = QDateTime::fromSecsSinceEpoch(sortInfo->lastModifiedTime());
-        }
-        if (info) {
-            auto lastModified = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
-        }
+
+        if (info)
+            lastModified = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
+
         return lastModified.isValid() ? lastModified.toString(FileUtils::dateTimeFormat()) : "-";
     }
     case kItemFileCreatedRole: {
@@ -270,6 +270,29 @@ QVariant FileItemData::data(int role) const
             return sortInfo->highlightContent();
 
         return QString();
+    case kItemFileCreatedDateRole: {
+        QDateTime created;
+        if (sortInfo && sortInfo->isInfoCompleted()) {
+            created = QDateTime::fromSecsSinceEpoch(sortInfo->createTime());
+        }
+        if (info) {
+            created = info->timeOf(TimeInfoType::kCreateTime).value<QDateTime>();
+        }
+    }
+    case kItemFileLastModifiedDateRole: {
+        QDateTime lastModified;
+        if (sortInfo && sortInfo->isInfoCompleted()) {
+            lastModified = QDateTime::fromSecsSinceEpoch(sortInfo->lastModifiedTime());
+        }
+        if (info)
+            lastModified = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
+
+        return lastModified;
+    }
+    case kItemFileMimeTypeNameRole:
+        if (info)
+            return info->nameOf(NameInfoType::kMimeTypeName);
+        return QVariant();
     default:
         return QVariant();
     }
