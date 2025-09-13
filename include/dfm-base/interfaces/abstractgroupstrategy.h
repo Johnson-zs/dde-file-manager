@@ -37,7 +37,10 @@ public:
      * @param info The file info to classify
      * @return The group key string that identifies which group this file belongs to
      */
-    virtual QString getGroupKey(const FileInfoPointer &info) const = 0;
+    // 这里不能使用fileinfo，在刚迭代出来的时候fileitemdata中fileinfo，是没有创建的，
+    // 只有在绘制的时候才能使用fileinfo，这里应该传入fileitemdata,需要注意的是desktop文件，需要dfm-io处理显示名称
+    // 所以使用QVariant进行处理
+    virtual QString getGroupKey(const QVariant &info) const = 0;
 
     /**
      * @brief Get the display name for a group key

@@ -99,7 +99,9 @@ FileSortWorker::GroupingOpt FileSortWorker::setGroupArguments(const Qt::SortOrde
 
     FileSortWorker::GroupingOpt opt { FileSortWorker::GroupingOpt::kGroupingOptNone };
     groupOrder = order;
-    currentStrategy = GroupingFactory::createStrategy(strategy, this);
+    if (!currentStrategy)
+        currentStrategy = GroupingFactory::createStrategy(strategy, this);
+
     isCurrentGroupingEnabled = (currentStrategy->getStrategyName() == GroupStrategty::kNoGroup) ? false : true;
 
     if (!currentStrategy || (groupOrder == order && currentStrategy->getStrategyName() == strategy)) {
@@ -661,6 +663,8 @@ void FileSortWorker::handleReGrouping(const Qt::SortOrder order, const QString &
         return;
     }
 
+    auto old = isCurrentGroupingEnabled.load(std::memory_order_acquire);
+
     auto opt = setGroupArguments(order, strategy);
 
     // TODO: 改为switch opt实现，以下只是 demo,仅实现基本的分组流程，以下分组数据完全异常，数据会丢失
@@ -668,6 +672,9 @@ void FileSortWorker::handleReGrouping(const Qt::SortOrder order, const QString &
 
     if (!isCurrentGroupingEnabled || !currentStrategy || !groupingEngine) {
         fmWarning() << "FileSortWorker: Cannot perform grouping - grouping disabled, no strategy, or no engine";
+        // 处理以前是文件分组，现在不是文件分组了，也需要更新界面
+        if (old)
+            emit groupingDataChanged();
         return;
     }
 
@@ -965,10 +972,13 @@ void FileSortWorker::handleAddChildren(const QString &key,
     if (!handleAddChildren(key, children, childInfos, isFirstBatch))
         return;
 
+    // 如果是文件分组模式使用下面的函数进行处理    -- 是否有效率问题
+    if (isCurrentGroupingEnabled)
+        handleReGrouping(groupOrder, currentStrategy->getStrategyName());
+
     if (children.isEmpty()) {
         if (handleSource)
             setSourceHandleState(isFinished);
-
         return;
     }
 

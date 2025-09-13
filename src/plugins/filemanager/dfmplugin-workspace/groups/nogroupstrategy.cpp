@@ -21,7 +21,7 @@ NoGroupStrategy::~NoGroupStrategy()
 {
 }
 
-QString NoGroupStrategy::getGroupKey(const FileInfoPointer &info) const
+QString NoGroupStrategy::getGroupKey(const QVariant &info) const
 {
     Q_UNUSED(info)
     // All files belong to the same virtual group in "no grouping" mode

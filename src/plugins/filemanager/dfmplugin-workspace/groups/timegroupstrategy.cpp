@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "timegroupstrategy.h"
+#include "models/fileitemdata.h"
 
 #include <dfm-base/dfm_log_defines.h>
-#include <dfm-base/interfaces/fileinfo.h>
 
 #include <QDate>
 #include <QLocale>
@@ -49,29 +49,37 @@ TimeGroupStrategy::~TimeGroupStrategy()
     fmDebug() << "TimeGroupStrategy: Destroyed";
 }
 
-QString TimeGroupStrategy::getGroupKey(const FileInfoPointer &info) const
+#include <dfm-base/interfaces/fileinfo.h>
+QString TimeGroupStrategy::getGroupKey(const QVariant &info) const
 {
-    if (!info) {
-        fmWarning() << "TimeGroupStrategy: Invalid fileInfo";
-        return "earlier";
+    if (!info.isValid()) {
+        fmWarning() << "SizeGroupStrategy: Invalid variant";
+        return "unknown";
+    }
+
+    auto itemData = info.value<FileItemDataPointer>();
+    if (!itemData) {
+        fmWarning() << "SizeGroupStrategy: Invalid file item data pointer!!";
+        return "unknown";
     }
 
     // Get the appropriate timestamp based on the time type
     QDateTime fileTime;
+
     if (m_timeType == ModificationTime) {
-        fileTime = info->timeOf(TimeInfoType::kLastModified).value<QDateTime>();
+        fileTime = itemData->data(Global::ItemRoles::kItemFileLastModifiedDateRole).value<QDateTime>();
     } else {
-        fileTime = info->timeOf(TimeInfoType::kCreateTime).value<QDateTime>();
+        fileTime = itemData->data(Global::ItemRoles::kItemFileCreatedDateRole).value<QDateTime>();
     }
 
     if (!fileTime.isValid()) {
-        fmWarning() << "TimeGroupStrategy: Invalid file time for" << info->urlOf(UrlInfoType::kUrl).toString();
+        fmWarning() << "TimeGroupStrategy: Invalid file time for" << itemData->data(Global::ItemRoles::kItemUrlRole).toString();
         return "earlier";
     }
 
     QString groupKey = calculateTimeGroup(fileTime);
 
-    fmDebug() << "TimeGroupStrategy: File" << info->urlOf(UrlInfoType::kUrl).toString()
+    fmDebug() << "TimeGroupStrategy: File" << itemData->data(Global::ItemRoles::kItemUrlRole).toString()
               << "time:" << fileTime.toString() << "-> group:" << groupKey;
 
     return groupKey;
