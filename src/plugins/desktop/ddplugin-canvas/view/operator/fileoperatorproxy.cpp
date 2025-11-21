@@ -13,6 +13,11 @@
 #include <dfm-base/dfm_event_defines.h>
 #include <dfm-base/utils/clipboard.h>
 #include <dfm-base/utils/fileutils.h>
+#include <QClipboard>
+#include <QMimeData>
+#include <QImage>
+#include <QDateTime>
+#include <QApplication>
 
 #include <dfm-framework/dpf.h>
 
@@ -261,7 +266,50 @@ void FileOperatorProxy::pasteFiles(const CanvasView *view, const QPoint pos)
     }
 
     if (urls.isEmpty()) {
-        fmDebug() << "No URLs in clipboard to paste";
+        fmDebug() << "No URLs in clipboard to paste - checking for image data";
+
+        // 检查剪贴板是否包含图像数据，如果没有传统文件要粘贴
+        const QMimeData *mimeData = QApplication::clipboard()->mimeData();
+        if (mimeData && mimeData->hasImage()) {
+            // 获取当前目录
+            const QUrl &targetDir = view->model()->rootUrl();
+            QString dirPath = targetDir.toLocalFile();
+            QFileInfo dirInfo(dirPath);
+            if (!dirInfo.isWritable()) {
+                fmWarning() << "Target directory is not writable:" << targetDir;
+                return;
+            }
+
+            // 从剪贴板获取图像
+            QImage image = qvariant_cast<QImage>(mimeData->imageData());
+            if (image.isNull()) {
+                fmWarning() << "Failed to get valid image from clipboard";
+                return;
+            }
+
+            // 生成保存路径
+            QDateTime now = QDateTime::currentDateTime();
+            QString timeStr = now.toString("yyyyMMdd_HHmmss_zzz");
+            QString baseName = QString("image_%1").arg(timeStr);
+            QString savePath = QString("%1/%2.png").arg(dirPath).arg(baseName);
+
+            // 确保文件名唯一
+            int counter = 1;
+            while (QFile::exists(savePath)) {
+                savePath = QString("%1/%2_%3.png").arg(dirPath).arg(baseName).arg(counter++);
+            }
+
+            // 保存图像
+            if (image.save(savePath, "PNG")) {
+                fmInfo() << "Image pasted successfully on desktop:" << savePath;
+
+            } else {
+                fmWarning() << "Failed to save image to desktop:" << savePath;
+            }
+            return;
+        }
+
+        fmDebug() << "No URLs or image data in clipboard to paste";
         return;
     }
 

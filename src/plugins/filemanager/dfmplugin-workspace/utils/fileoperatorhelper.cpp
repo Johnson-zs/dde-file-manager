@@ -19,6 +19,12 @@
 
 #include <dfm-framework/dpf.h>
 
+#include <QClipboard>
+#include <QMimeData>
+#include <QImage>
+#include <QDateTime>
+#include <QApplication>
+
 Q_DECLARE_METATYPE(QList<QUrl> *)
 
 DFMGLOBAL_USE_NAMESPACE
@@ -252,15 +258,31 @@ void FileOperatorHelper::cutFiles(const FileView *view)
 void FileOperatorHelper::pasteFiles(const FileView *view)
 {
     fmInfo() << "Paste file by clipboard and current dir: " << view->rootUrl();
-    auto action = ClipBoard::instance()->clipboardAction();
-    // trash dir can't paste files for copy
+
+    // 检查目标目录是否为 trash
     if (FileUtils::isTrashFile(view->rootUrl())) {
         fmDebug() << "Paste operation blocked - target is trash directory";
         return;
     }
 
+    // 尝试传统文件粘贴
+    if (pasteTraditionalFiles(view)) {
+        return;
+    }
+
+    // 尝试图像粘贴
+    pasteClipboardImage(view);
+}
+
+bool FileOperatorHelper::pasteTraditionalFiles(const FileView *view)
+{
+    auto action = ClipBoard::instance()->clipboardAction();
     auto sourceUrls = ClipBoard::instance()->clipboardFileUrlList();
     auto windowId = WorkspaceHelper::instance()->windowId(view);
+
+    if (action == ClipBoard::kUnknownAction || sourceUrls.isEmpty()) {
+        return false;
+    }
 
     if (ClipBoard::kCopyAction == action) {
         fmDebug() << "Executing copy action";
@@ -270,7 +292,6 @@ void FileOperatorHelper::pasteFiles(const FileView *view)
                                      view->rootUrl(),
                                      AbstractJobHandler::JobFlag::kNoHint, nullptr);
     } else if (ClipBoard::kCutAction == action) {
-
         if (ClipBoard::supportCut()) {
             fmDebug() << "Executing cut action and clearing clipboard";
             dpfSignalDispatcher->publish(GlobalEventType::kCutFile,
@@ -294,8 +315,78 @@ void FileOperatorHelper::pasteFiles(const FileView *view)
                                      AbstractJobHandler::JobFlag::kCopyRemote,
                                      nullptr);
     } else {
-        fmWarning() << "Unknown clipboard past action:" << action << " urls:" << sourceUrls;
+        return false;
     }
+
+    return true;
+}
+
+void FileOperatorHelper::pasteClipboardImage(const FileView *view)
+{
+    // 检查剪贴板是否包含图像数据
+    const QMimeData *mimeData = QApplication::clipboard()->mimeData();
+    if (!mimeData || !mimeData->hasImage()) {
+        fmWarning() << "Clipboard does not contain image data";
+        return;
+    }
+
+    // 检查目录是否可写
+    const QUrl &targetDir = view->rootUrl();
+    QString dirPath = targetDir.toLocalFile();
+    QFileInfo dirInfo(dirPath);
+    if (!dirInfo.isWritable()) {
+        fmWarning() << "Target directory is not writable:" << targetDir;
+        return;
+    }
+
+    // 获取图像
+    QImage image = qvariant_cast<QImage>(mimeData->imageData());
+    if (image.isNull()) {
+        fmWarning() << "Failed to get valid image from clipboard";
+        return;
+    }
+
+    // 生成保存路径
+    QString savePath = generateUniqueImagePath(targetDir);
+    if (savePath.isEmpty()) {
+        fmWarning() << "Failed to generate save path for image";
+        return;
+    }
+
+    // 保存图像
+    if (image.save(savePath, "PNG")) {
+        fmInfo() << "Image pasted successfully:" << savePath;
+
+        // 选中新创建的文件 - 使用系统提供的laterRequestSelectFiles确保可靠执行
+        QList<QUrl> newFileUrls { QUrl::fromLocalFile(savePath) };
+
+        // 使用系统已经实现的延迟选择机制，确保文件被正确识别
+        WorkspaceHelper::instance()->laterRequestSelectFiles(newFileUrls);
+
+    } else {
+        fmWarning() << "Failed to save image to:" << savePath;
+    }
+}
+
+QString FileOperatorHelper::generateUniqueImagePath(const QUrl &targetDir)
+{
+    QDateTime now = QDateTime::currentDateTime();
+    QString timeStr = now.toString("yyyyMMdd_HHmmss_zzz");
+
+    // 基础文件名
+    QString baseName = QString("image_%1").arg(timeStr);
+    QString dirPath = targetDir.toLocalFile();
+
+    // 尝试直接使用基础名
+    QString fullPath = QString("%1/%2.png").arg(dirPath).arg(baseName);
+    int counter = 1;
+
+    // 如果文件已存在，添加计数器
+    while (QFile::exists(fullPath)) {
+        fullPath = QString("%1/%2_%3.png").arg(dirPath).arg(baseName).arg(counter++);
+    }
+
+    return fullPath;
 }
 
 void FileOperatorHelper::undoFiles(const FileView *view)
