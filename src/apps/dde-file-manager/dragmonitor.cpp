@@ -6,11 +6,14 @@
 
 #include <dfm-base/utils/loggerrules.h>
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QDragEnterEvent>
+#include <QContextMenuEvent>
 #include <QMimeData>
 #include <QDBusConnection>
 #include <QDebug>
+#include <QMenu>
+#include <QTimer>
 
 using namespace dfm_drag;
 Q_DECLARE_LOGGING_CATEGORY(logAppFileManager)
@@ -71,6 +74,51 @@ bool DragMoniter::eventFilter(QObject *watched, QEvent *event)
 
             if (!str.isEmpty()) {
                 QMetaObject::invokeMethod(this, "DragEnter", Qt::QueuedConnection, Q_ARG(QStringList, str));
+            }
+        }
+    }
+
+    // Handle right-click outside menu for continuous context menu behavior
+    if (event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+
+        if (mouseEvent->button() == Qt::RightButton) {
+            QWidget *activePopup = QApplication::activePopupWidget();
+            QMenu *activeMenu = qobject_cast<QMenu *>(activePopup);
+
+            if (activeMenu) {
+                QPoint globalPos = mouseEvent->globalPos();
+
+                // Check if click is inside menu or its visible submenus
+                bool insideMenu = activeMenu->geometry().contains(globalPos);
+                if (!insideMenu) {
+                    // Check active submenu if exists
+                    QAction *active = activeMenu->activeAction();
+                    if (active && active->menu() && active->menu()->isVisible()) {
+                        insideMenu = active->menu()->geometry().contains(globalPos);
+                    }
+                }
+
+                if (!insideMenu) {
+                    // Close the menu first
+                    activeMenu->close();
+
+                    // Use QTimer to ensure menu is fully closed before triggering new context menu
+                    // Key fix: Send QContextMenuEvent instead of QMouseEvent
+                    QTimer::singleShot(0, this, [globalPos]() {
+                        QWidget *targetWidget = QApplication::widgetAt(globalPos);
+                        if (targetWidget) {
+                            QPoint localPos = targetWidget->mapFromGlobal(globalPos);
+                            QContextMenuEvent *contextEvent = new QContextMenuEvent(
+                                    QContextMenuEvent::Mouse,
+                                    localPos,
+                                    globalPos);
+                            QApplication::postEvent(targetWidget, contextEvent);
+                        }
+                    });
+
+                    return true;
+                }
             }
         }
     }
