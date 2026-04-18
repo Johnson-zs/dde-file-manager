@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mainwindow.h"
+#include "indexstatisticsdialog.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -20,6 +21,8 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QtConcurrent>
+#include <QComboBox>
+#include <QGroupBox>
 
 // AnalyzerTab implementation
 
@@ -82,12 +85,15 @@ void AnalyzerTab::setupUI()
     QHBoxLayout* indexOpsLayout = new QHBoxLayout();
     m_createIndexBtn = new QPushButton(tr("Create Index"));
     m_deleteIndexBtn = new QPushButton(tr("Delete Index"));
+    m_statsBtn = new QPushButton(tr("View Stats"));
 
     m_createIndexBtn->setMinimumWidth(120);
     m_deleteIndexBtn->setMinimumWidth(120);
+    m_statsBtn->setMinimumWidth(100);
 
     connect(m_createIndexBtn, &QPushButton::clicked, this, &AnalyzerTab::onCreateIndex);
     connect(m_deleteIndexBtn, &QPushButton::clicked, this, &AnalyzerTab::onDeleteIndex);
+    connect(m_statsBtn, &QPushButton::clicked, this, &AnalyzerTab::onViewStatistics);
 
     m_progressBar = new QProgressBar();
     m_progressBar->setTextVisible(true);
@@ -96,6 +102,7 @@ void AnalyzerTab::setupUI()
 
     indexOpsLayout->addWidget(m_createIndexBtn);
     indexOpsLayout->addWidget(m_deleteIndexBtn);
+    indexOpsLayout->addWidget(m_statsBtn);
     indexOpsLayout->addStretch();
     mainLayout->addLayout(indexOpsLayout);
     mainLayout->addWidget(m_progressBar);
@@ -219,6 +226,18 @@ void AnalyzerTab::onDeleteIndex()
     }
 }
 
+void AnalyzerTab::onViewStatistics()
+{
+    if (!m_indexManager->indexExists()) {
+        QMessageBox::warning(this, tr("Warning"), tr("No index exists. Please create an index first."));
+        return;
+    }
+
+    IndexStatisticsDialog* dialog = new IndexStatisticsDialog(m_indexManager, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+}
+
 void AnalyzerTab::onSearch()
 {
     QString query = m_searchEdit->text().trimmed();
@@ -313,6 +332,7 @@ void AnalyzerTab::updateButtonStates()
     m_createIndexBtn->setEnabled(hasSource && !m_isIndexing);
     m_deleteIndexBtn->setEnabled(hasIndex && !m_isIndexing);
     m_searchBtn->setEnabled(hasIndex && !m_isIndexing);
+    m_statsBtn->setEnabled(hasIndex && !m_isIndexing);
     m_searchEdit->setEnabled(hasIndex && !m_isIndexing);
     m_browseBtn->setEnabled(!m_isIndexing);
 }
@@ -345,7 +365,7 @@ MainWindow::~MainWindow()
 void MainWindow::setupUI()
 {
     setWindowTitle(tr("Lucene Index Performance Test"));
-    resize(900, 700);
+    resize(900, 750);
 
     QWidget* centralWidget = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(centralWidget);
@@ -363,6 +383,40 @@ void MainWindow::setupUI()
     headerLayout->addWidget(m_refreshBtn);
 
     layout->addLayout(headerLayout);
+
+    // Custom index analysis section
+    QGroupBox* customGroup = new QGroupBox(tr("Analyze Custom Index"));
+    QHBoxLayout* customLayout = new QHBoxLayout(customGroup);
+
+    customLayout->addWidget(new QLabel(tr("Index Path:")));
+    m_customPathEdit = new QLineEdit();
+    m_customPathEdit->setPlaceholderText(tr("Select or enter custom index directory..."));
+    customLayout->addWidget(m_customPathEdit, 1);
+
+    m_customBrowseBtn = new QPushButton(tr("Browse"));
+    connect(m_customBrowseBtn, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getExistingDirectory(
+            this,
+            tr("Select Custom Index Directory"),
+            m_customPathEdit->text().isEmpty() ? QDir::homePath() : m_customPathEdit->text()
+        );
+        if (!path.isEmpty()) {
+            m_customPathEdit->setText(path);
+        }
+    });
+    customLayout->addWidget(m_customBrowseBtn);
+
+    customLayout->addWidget(new QLabel(tr("Analyzer:")));
+    m_customAnalyzerCombo = new QComboBox();
+    m_customAnalyzerCombo->setMinimumWidth(120);
+    customLayout->addWidget(m_customAnalyzerCombo);
+
+    m_customAnalyzeBtn = new QPushButton(tr("View Stats"));
+    m_customAnalyzeBtn->setMinimumWidth(100);
+    connect(m_customAnalyzeBtn, &QPushButton::clicked, this, &MainWindow::onAnalyzeCustomIndex);
+    customLayout->addWidget(m_customAnalyzeBtn);
+
+    layout->addWidget(customGroup);
 
     // Tab widget for each analyzer
     m_tabWidget = new QTabWidget();
@@ -386,6 +440,9 @@ void MainWindow::refreshAnalyzers()
     qDeleteAll(m_tabs);
     m_tabs.clear();
 
+    // Clear and populate analyzer combo
+    m_customAnalyzerCombo->clear();
+
     // Create tabs for each registered analyzer
     QStringList analyzers = AnalyzerFactory::instance()->registeredAnalyzers();
 
@@ -395,5 +452,45 @@ void MainWindow::refreshAnalyzers()
         AnalyzerTab* tab = new AnalyzerTab(analyzerId);
         m_tabs[analyzerId] = tab;
         m_tabWidget->addTab(tab, info.displayName);
+
+        // Add to custom analyzer combo
+        m_customAnalyzerCombo->addItem(info.displayName, analyzerId);
     }
+}
+
+void MainWindow::onAnalyzeCustomIndex()
+{
+    QString customPath = m_customPathEdit->text().trimmed();
+    if (customPath.isEmpty()) {
+        QMessageBox::warning(this, tr("Warning"), tr("Please enter or select a custom index directory."));
+        return;
+    }
+
+    QDir dir(customPath);
+    if (!dir.exists()) {
+        QMessageBox::warning(this, tr("Warning"), tr("The specified directory does not exist."));
+        return;
+    }
+
+    if (dir.entryList(QDir::Files).isEmpty()) {
+        QMessageBox::warning(this, tr("Warning"), tr("The specified directory does not appear to contain a valid index."));
+        return;
+    }
+
+    QString analyzerId = m_customAnalyzerCombo->currentData().toString();
+
+    // Create IndexManager with custom path
+    IndexManager* manager = new IndexManager(customPath, analyzerId, this);
+
+    if (!manager->indexExists()) {
+        QMessageBox::warning(this, tr("Warning"), tr("No valid index found at the specified path."));
+        delete manager;
+        return;
+    }
+
+    // Open statistics dialog
+    IndexStatisticsDialog* dialog = new IndexStatisticsDialog(manager, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &QDialog::destroyed, manager, &QObject::deleteLater);
+    dialog->show();
 }

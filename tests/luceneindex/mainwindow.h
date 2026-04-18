@@ -17,6 +17,7 @@ class QTextEdit;
 class QProgressBar;
 class QTreeWidget;
 class QLabel;
+class QComboBox;
 
 class AnalyzerTab : public QWidget
 {
@@ -33,6 +34,7 @@ private slots:
     void onCreateIndex();
     void onDeleteIndex();
     void onSearch();
+    void onViewStatistics();
     void onProgressChanged(qint64 processed, qint64 total);
     void onIndexingFinished(bool success, const QString& message);
 
@@ -52,6 +54,7 @@ private:
     QPushButton* m_createIndexBtn { nullptr };
     QPushButton* m_deleteIndexBtn { nullptr };
     QPushButton* m_searchBtn { nullptr };
+    QPushButton* m_statsBtn { nullptr };
     QProgressBar* m_progressBar { nullptr };
     QLabel* m_statsLabel { nullptr };
     QLabel* m_timeLabel { nullptr };
@@ -69,6 +72,9 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+private slots:
+    void onAnalyzeCustomIndex();
+
 private:
     void setupUI();
     void refreshAnalyzers();
@@ -76,6 +82,12 @@ private:
     QTabWidget* m_tabWidget { nullptr };
     QPushButton* m_refreshBtn { nullptr };
     QHash<QString, AnalyzerTab*> m_tabs;
+
+    // Custom index analysis
+    QLineEdit* m_customPathEdit { nullptr };
+    QComboBox* m_customAnalyzerCombo { nullptr };
+    QPushButton* m_customBrowseBtn { nullptr };
+    QPushButton* m_customAnalyzeBtn { nullptr };
 };
 
 #endif // MAINWINDOW_H

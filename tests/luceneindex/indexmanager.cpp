@@ -26,6 +26,7 @@ QString IndexManager::s_baseIndexDir;
 IndexManager::IndexManager(const QString& analyzerId, QObject* parent)
     : QObject(parent)
     , m_analyzerId(analyzerId)
+    , m_isCustomPath(false)
 {
     if (s_baseIndexDir.isEmpty()) {
         s_baseIndexDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
@@ -35,12 +36,24 @@ IndexManager::IndexManager(const QString& analyzerId, QObject* parent)
     m_analyzer = AnalyzerFactory::instance()->createAnalyzer(analyzerId);
 }
 
+IndexManager::IndexManager(const QString& customIndexPath, const QString& analyzerId, QObject* parent)
+    : QObject(parent)
+    , m_analyzerId(analyzerId)
+    , m_customIndexPath(customIndexPath)
+    , m_isCustomPath(true)
+{
+    m_analyzer = AnalyzerFactory::instance()->createAnalyzer(analyzerId);
+}
+
 IndexManager::~IndexManager()
 {
 }
 
 QString IndexManager::indexDirectory() const
 {
+    if (m_isCustomPath) {
+        return m_customIndexPath;
+    }
     return s_baseIndexDir + "/" + m_analyzerId;
 }
 
@@ -289,11 +302,12 @@ Lucene::DocumentPtr IndexManager::createDocument(const QString& filePath)
     doc->add(newLucene<Field>(L"is_hidden", hiddenTag.toStdWString(),
                               Field::STORE_YES, Field::INDEX_NOT_ANALYZED));
 
-    // Content
+    // Content - with term vectors for analysis
     QString content = extractFileContent(filePath);
     if (!content.isEmpty()) {
         doc->add(newLucene<Field>(L"contents", content.toStdWString(),
-                                  Field::STORE_NO, Field::INDEX_ANALYZED));
+                                  Field::STORE_YES, Field::INDEX_ANALYZED,
+                                  Field::TERM_VECTOR_YES));
     }
 
     return doc;

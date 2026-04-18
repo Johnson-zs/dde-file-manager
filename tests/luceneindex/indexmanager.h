@@ -45,7 +45,12 @@ class IndexManager : public QObject
     Q_OBJECT
 
 public:
+    // Standard constructor with analyzer ID (auto-managed path)
     explicit IndexManager(const QString& analyzerId, QObject* parent = nullptr);
+
+    // Constructor for custom index path (for analyzing existing indexes)
+    explicit IndexManager(const QString& customIndexPath, const QString& analyzerId, QObject* parent = nullptr);
+
     ~IndexManager() override;
 
     // Index directory management
@@ -63,11 +68,14 @@ public:
     bool deleteIndex();
 
     // Search operations
-    QList<SearchResult> search(const QString& query, int maxResults = 100);
+    QList<SearchResult> search(const QString& query, int maxResults = 1000);
     qint64 lastSearchTimeMs() const;
 
     // Statistics
     IndexStats getIndexStats() const;
+
+    // Analyzer ID
+    QString analyzerId() const { return m_analyzerId; }
 
     // Progress
     qint64 processedCount() const { return m_processedCount; }
@@ -85,11 +93,14 @@ private:
 
     QString m_analyzerId;
     QString m_sourceDirectory;
+    QString m_customIndexPath;   // For custom index path mode
     Lucene::AnalyzerPtr m_analyzer;
 
     qint64 m_processedCount { 0 };
     qint64 m_totalCount { 0 };
     qint64 m_lastSearchTimeMs { 0 };
+
+    bool m_isCustomPath { false };   // True if using custom index path
 
     static QString s_baseIndexDir;
 };
