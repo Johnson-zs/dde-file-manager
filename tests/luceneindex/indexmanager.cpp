@@ -110,6 +110,7 @@ bool IndexManager::createIndex()
 
         for (const QString& file : files) {
             try {
+                qWarning() << "======>" << file;
                 DocumentPtr doc = createDocument(file);
                 if (doc) {
                     writer->addDocument(doc);
@@ -262,7 +263,7 @@ void IndexManager::traverseDirectory(const QString& path, QStringList& files)
             QString suffix = info.suffix().toLower();
             static const QStringList supportedExts = {
                 "txt", "md", "cpp", "h", "c", "hpp", "cc", "cxx",
-                "py", "java", "js", "ts", "json", "xml", "html", "htm",
+                "py", "java", "js", "ts", "json", "xml",
                 "css", "sh", "bash", "conf", "cfg", "ini", "yaml", "yml",
                 "doc", "docx", "pdf", "xls", "xlsx", "ppt", "pptx",
                 "odt", "ods", "odp", "rtf"
@@ -287,8 +288,9 @@ Lucene::DocumentPtr IndexManager::createDocument(const QString& filePath)
     doc->add(newLucene<Field>(L"path", filePath.toStdWString(),
                               Field::STORE_YES, Field::INDEX_NOT_ANALYZED));
 
-    // Filename field
-    doc->add(newLucene<Field>(L"filename", fileInfo.fileName().toStdWString(),
+    // Filename field - remove null bytes and collapse horizontal whitespace
+    QString filename = fileInfo.fileName();
+    doc->add(newLucene<Field>(L"filename", filename.toStdWString(),
                               Field::STORE_YES, Field::INDEX_ANALYZED));
 
     // Modified time
@@ -302,9 +304,18 @@ Lucene::DocumentPtr IndexManager::createDocument(const QString& filePath)
     doc->add(newLucene<Field>(L"is_hidden", hiddenTag.toStdWString(),
                               Field::STORE_YES, Field::INDEX_NOT_ANALYZED));
 
-    // Content - with term vectors for analysis
+    // Content - process line by line: skip blank lines, simplify non-blank lines
     QString content = extractFileContent(filePath);
     if (!content.isEmpty()) {
+        QStringList lines = content.split(QLatin1Char('\n'));
+        QStringList cleaned;
+        cleaned.reserve(lines.size());
+        for (const QString& line : lines) {
+            QString s = line.simplified();
+            if (!s.isEmpty())
+                cleaned.append(s);
+        }
+        content = cleaned.join(QLatin1Char('\n'));
         doc->add(newLucene<Field>(L"contents", content.toStdWString(),
                                   Field::STORE_YES, Field::INDEX_ANALYZED,
                                   Field::TERM_VECTOR_YES));

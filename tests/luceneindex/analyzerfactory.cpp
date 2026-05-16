@@ -5,6 +5,7 @@
 #include "analyzerfactory.h"
 
 #include <fulltext/chineseanalyzer.h>
+#include "ngramanalyzer.h"
 
 #include <StandardAnalyzer.h>
 #include <SimpleAnalyzer.h>
@@ -100,5 +101,13 @@ void AnalyzerFactory::registerBuiltInAnalyzers()
         "Whitespace Analyzer",
         "Splits text on whitespace characters only",
         []() { return newLucene<WhitespaceAnalyzer>(); }
+    );
+
+    // NGram Analyzer - Breaks text into n-grams (2-4)
+    registerAnalyzer(
+        "ngram",
+        "NGram Analyzer (2-4)",
+        "Generates n-gram tokens of sizes 2 to 4, suitable for partial/fuzzy matching",
+        []() { return newLucene<NGramAnalyzer>(2, 2); }
     );
 }
