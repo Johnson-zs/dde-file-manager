@@ -106,8 +106,16 @@ void AnalyzerFactory::registerBuiltInAnalyzers()
     // NGram Analyzer - Breaks text into n-grams (2-4)
     registerAnalyzer(
         "ngram",
-        "NGram Analyzer (2-4)",
+        "NGram Analyzer (2-2)",
         "Generates n-gram tokens of sizes 2 to 4, suitable for partial/fuzzy matching",
         []() { return newLucene<NGramAnalyzer>(2, 2); }
+    );
+
+    // NGram Analyzer - Breaks text into n-grams (2-4)
+    registerAnalyzer(
+            "ngram12",
+            "NGram Analyzer (1-2)",
+            "Generates n-gram tokens of sizes 2 to 4, suitable for partial/fuzzy matching",
+            []() { return newLucene<NGramAnalyzer>(1, 2); }
     );
 }

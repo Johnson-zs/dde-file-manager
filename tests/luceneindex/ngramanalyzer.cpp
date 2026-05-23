@@ -8,8 +8,7 @@
 namespace Lucene {
 
 NGramAnalyzer::NGramAnalyzer(int32_t minGram, int32_t maxGram)
-    : m_minGram(minGram)
-    , m_maxGram(maxGram)
+    : m_minGram(minGram), m_maxGram(maxGram)
 {
 }
 
@@ -17,12 +16,12 @@ NGramAnalyzer::~NGramAnalyzer()
 {
 }
 
-TokenStreamPtr NGramAnalyzer::tokenStream(const String& fieldName, const ReaderPtr& reader)
+TokenStreamPtr NGramAnalyzer::tokenStream(const String &fieldName, const ReaderPtr &reader)
 {
     return newLucene<NGramTokenizer>(reader, m_minGram, m_maxGram);
 }
 
-TokenStreamPtr NGramAnalyzer::reusableTokenStream(const String& fieldName, const ReaderPtr& reader)
+TokenStreamPtr NGramAnalyzer::reusableTokenStream(const String &fieldName, const ReaderPtr &reader)
 {
     LuceneObjectPtr prev = getPreviousTokenStream();
     TokenizerPtr saved(boost::dynamic_pointer_cast<Tokenizer>(prev));
@@ -35,4 +34,4 @@ TokenStreamPtr NGramAnalyzer::reusableTokenStream(const String& fieldName, const
     return saved;
 }
 
-} // namespace Lucene
+}   // namespace Lucene
