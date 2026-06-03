@@ -5,6 +5,7 @@ After=dbus.service
 [Service]
 Type=dbus
 BusName=org.deepin.Filemanager.DiskEncrypt
+ExecStartPre=-/usr/libexec/dde-thp-disable
 ExecStart=/usr/bin/deepin-diskencrypt-service
 User=root
 

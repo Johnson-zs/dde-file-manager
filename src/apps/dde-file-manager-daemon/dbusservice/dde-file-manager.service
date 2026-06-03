@@ -10,6 +10,7 @@ Before=dde-session-initialized.target
 [Service]
 Type=dbus
 BusName=org.deepin.Filemanager.Daemon
+ExecStartPre=-/usr/libexec/dde-thp-disable
 ExecStart=/usr/bin/dde-file-manager-daemon
 TimeoutStopSec=10
 
