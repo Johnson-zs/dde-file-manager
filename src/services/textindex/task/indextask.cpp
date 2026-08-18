@@ -61,19 +61,25 @@ void IndexTask::setSilent(bool newSilent)
 
 void IndexTask::throttleCpuUsage()
 {
-    if (!silent()) {
-        fmDebug() << "[IndexTask::throttleCpuUsage] Skipping CPU throttling - not in silent mode";
+    const QString service = m_serviceName.isEmpty() ? Defines::kCgroupServiceName : m_serviceName;
+
+    if (!m_resourceControl) {
+        // Manual immediate update (decision 1): no rate limiting.
+        fmDebug() << "[IndexTask::throttleCpuUsage] Resource control disabled, resetting CPU quota for service:" << service;
+        QString msg;
+        if (!SystemdCpuUtils::resetCpuQuota(service, &msg)) {
+            fmWarning() << "[IndexTask::throttleCpuUsage] Failed to reset CPU quota:" << msg;
+        }
         return;
     }
 
     int limit = TextIndexConfig::instance().cpuUsageLimitPercent();
-    fmDebug() << "[IndexTask::throttleCpuUsage] Applying CPU usage limit:" << limit << "% for service:"
-              << Defines::kTextIndexServiceName;
+    fmDebug() << "[IndexTask::throttleCpuUsage] Applying CPU usage limit:" << limit << "% for service:" << service;
 
     QString msg;
-    if (!SystemdCpuUtils::setCpuQuota(Defines::kTextIndexServiceName, limit, &msg)) {
+    if (!SystemdCpuUtils::setCpuQuota(service, limit, &msg)) {
         fmWarning() << "[IndexTask::throttleCpuUsage] Failed to set CPU quota:" << msg
-                    << "service:" << Defines::kTextIndexServiceName << "limit:" << limit << "%";
+                    << "service:" << service << "limit:" << limit << "%";
     } else {
         fmDebug() << "[IndexTask::throttleCpuUsage] CPU quota applied successfully - limit:" << limit << "%";
     }

@@ -43,20 +43,22 @@ void OcrIndexDBusPrivate::initialize()
 
 void OcrIndexDBusPrivate::initConnect()
 {
-    QObject::connect(runtime->taskManager(), &TaskManager::taskFinished,
+    // Task lifecycle & status notifications come from the scheduler, which
+    // centralises CPU-quota reset using the shared process cgroup (design R8:
+    // previously OcrIndexDBus reset kTextIndexServiceName directly; now both
+    // runtimes go through Defines::kCgroupServiceName via the scheduler).
+    QObject::connect(runtime->scheduler(), &TaskScheduler::taskFinished,
                      q, [this](const QString &type, const QString &path, bool success) {
-                         QString msg;
-                         fmDebug() << "OcrIndexDBus: Resetting CPU limit after task completion";
-                         if (!SystemdCpuUtils::resetCpuQuota(Defines::kTextIndexServiceName, &msg)) {
-                             fmWarning() << "OcrIndexDBus: Failed to reset CPU quota:" << msg;
-                         }
                          emit q->TaskFinished(type, path, success);
                      });
 
-    QObject::connect(runtime->taskManager(), &TaskManager::taskProgressChanged,
+    QObject::connect(runtime->scheduler(), &TaskScheduler::taskProgressChanged,
                      q, [this](const QString &type, const QString &path, qint64 count, qint64 total) {
                          emit q->TaskProgressChanged(type, path, count, total);
                      });
+
+    QObject::connect(runtime->scheduler(), &TaskScheduler::statusChanged,
+                     q, &OcrIndexDBus::IndexStatusChanged);
 
     QObject::connect(runtime->fsEventController(), &FSEventController::requestProcessFileChanges,
                      q, &OcrIndexDBus::ProcessFileChanges);
@@ -113,29 +115,10 @@ void OcrIndexDBusPrivate::handleSlientStart()
             return;
         }
 
-        if (!q->IndexDatabaseExists()) {
-            fmInfo() << "OcrIndexDBus: Index database does not exist, starting create task for:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Create, pathsToProcess, true);
-            return;
+        // Boot / crash recovery is graded and gated by the scheduler (design §6.5).
+        if (!runtime->scheduler()->submitBootRecovery(pathsToProcess)) {
+            fmInfo() << "OcrIndexDBus: Clean state and no config changes, skipping global update";
         }
-
-        // Use recoveryPending flag which was set at startup if Dirty state was detected
-        const bool needsRecovery = runtime->taskManager()->isRecoveryPending();
-        const bool needsRebuild = runtime->stateStore().needsRebuild();
-
-        if (needsRebuild) {
-            fmInfo() << "OcrIndexDBus: Config changed, clearing needsRebuild flag";
-            runtime->stateStore().setNeedsRebuild(false);
-        }
-
-        if (needsRebuild || needsRecovery) {
-            fmInfo() << "OcrIndexDBus: Starting update task - needsRebuild:" << needsRebuild
-                     << "needsRecovery:" << needsRecovery << "for:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Update, pathsToProcess, true);
-            return;
-        }
-
-        fmInfo() << "OcrIndexDBus: Clean state and no config changes, skipping global update";
     });
 }
 
@@ -155,8 +138,8 @@ bool OcrIndexDBusPrivate::canSilentlyRefreshIndex(const QString &path) const
     return true;
 }
 
-OcrIndexDBus::OcrIndexDBus(QObject *parent)
-    : QObject(parent), QDBusContext(), d(new OcrIndexDBusPrivate(this))
+OcrIndexDBus::OcrIndexDBus(EnvDetector *envDetector, QObject *parent)
+    : QObject(parent), QDBusContext(), d(new OcrIndexDBusPrivate(this, envDetector))
 {
     QDBusConnection::RegisterOptions opts =
             QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals | QDBusConnection::ExportAllProperties;
@@ -196,14 +179,12 @@ void OcrIndexDBus::SetEnabled(bool enabled)
 
 bool OcrIndexDBus::CreateIndexTask(const QStringList &paths, const QVariantMap &options)
 {
-    bool silent = options.value("silent", false).toBool();
-    return d->runtime->taskManager()->startTask(IndexTask::Type::Create, paths, silent);
+    return d->runtime->scheduler()->submit(IndexTask::Type::Create, paths, options);
 }
 
 bool OcrIndexDBus::UpdateIndexTask(const QStringList &paths, const QVariantMap &options)
 {
-    bool silent = options.value("silent", false).toBool();
-    return d->runtime->taskManager()->startTask(IndexTask::Type::Update, paths, silent);
+    return d->runtime->scheduler()->submit(IndexTask::Type::Update, paths, options);
 }
 
 bool OcrIndexDBus::StopCurrentTask()
@@ -247,28 +228,32 @@ QString OcrIndexDBus::GetLastUpdateTime()
     return d->runtime->stateStore().getLastUpdateTime();
 }
 
+QString OcrIndexDBus::GetIndexStatus()
+{
+    return d->runtime->scheduler()->statusJson();
+}
+
+bool OcrIndexDBus::ContinueUpdate()
+{
+    return d->runtime->scheduler()->continueUpdate();
+}
+
+bool OcrIndexDBus::UpdateImmediately(const QStringList &paths)
+{
+    return d->runtime->scheduler()->updateImmediately(paths);
+}
+
+bool OcrIndexDBus::RebuildIndex(const QStringList &paths, const QVariantMap &options)
+{
+    return d->runtime->scheduler()->rebuildIndex(paths, options);
+}
+
 bool OcrIndexDBus::ProcessFileChanges(const QStringList &createdFiles,
                                       const QStringList &modifiedFiles,
                                       const QStringList &deletedFiles)
 {
-    bool tasksQueued = false;
-
-    if (!deletedFiles.isEmpty()) {
-        fmInfo() << "OcrIndexDBus: Processing" << deletedFiles.size() << "deleted files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::RemoveFileList, deletedFiles, true) || tasksQueued;
-    }
-
-    if (!createdFiles.isEmpty()) {
-        fmInfo() << "OcrIndexDBus: Processing" << createdFiles.size() << "created files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::CreateFileList, createdFiles, true) || tasksQueued;
-    }
-
-    if (!modifiedFiles.isEmpty()) {
-        fmInfo() << "OcrIndexDBus: Processing" << modifiedFiles.size() << "modified files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::UpdateFileList, modifiedFiles, true) || tasksQueued;
-    }
-
-    return tasksQueued;
+    return d->runtime->scheduler()->submitIncrementalBatch(createdFiles, modifiedFiles,
+                                                           deletedFiles, {});
 }
 
 bool OcrIndexDBus::ProcessFileMoves(const QHash<QString, QString> &movedFiles)
@@ -279,7 +264,7 @@ bool OcrIndexDBus::ProcessFileMoves(const QHash<QString, QString> &movedFiles)
     }
 
     fmInfo() << "OcrIndexDBus: Processing" << movedFiles.size() << "moved files";
-    return d->runtime->taskManager()->startFileMoveTask(movedFiles, true);
+    return d->runtime->scheduler()->submitIncrementalBatch({}, {}, {}, movedFiles);
 }
 
 void OcrIndexDBusPrivate::initializeSupportedExtensions()
@@ -303,7 +288,7 @@ void OcrIndexDBusPrivate::handleConfigChanged()
         const QStringList pathsToProcess = defaultPathsToProcess();
         if (q->IndexDatabaseExists()) {
             fmInfo() << "OcrIndexDBus: Starting index update task due to supported OCR image extensions change for paths:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Update, pathsToProcess);
+            runtime->scheduler()->submit(IndexTask::Type::Update, pathsToProcess);
         } else {
             fmWarning() << "OcrIndexDBus: Cannot start index update task, index database does not exist";
         }

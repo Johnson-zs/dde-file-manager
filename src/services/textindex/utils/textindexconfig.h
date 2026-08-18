@@ -45,6 +45,13 @@ public:
     int cpuLoadThresholdPercent() const;
     int diskBusyThresholdPercent() const;
 
+    // Strategy optimization – task grading thresholds & manual resource control
+    int lightIncrementalContentFileLimit() const;
+    int lightIncrementalOcrFileLimit() const;
+    int lightIncrementalSizeLimitMB() const;
+    bool manualResumeResourceControl() const;
+    bool manualImmediateResourceControl() const;
+
     // Call this if you need to manually reload all configurations
     Q_INVOKABLE void reloadConfig();
 
@@ -81,6 +88,12 @@ private:
     int m_cpuLoadThresholdPercent { 30 };
     int m_diskBusyThresholdPercent { 50 };
 
+    int m_lightIncrementalContentFileLimit { 100 };
+    int m_lightIncrementalOcrFileLimit { 30 };
+    int m_lightIncrementalSizeLimitMB { 200 };
+    bool m_manualResumeResourceControl { true };
+    bool m_manualImmediateResourceControl { false };
+
     mutable QMutex m_mutex;
 
     // Default values (matching your JSON for robustness)
@@ -99,6 +112,11 @@ private:
     static const int DEFAULT_LOAD_SAMPLE_INTERVAL_SECONDS = 5;
     static const int DEFAULT_CPU_LOAD_THRESHOLD_PERCENT = 30;
     static const int DEFAULT_DISK_BUSY_THRESHOLD_PERCENT = 50;
+    static const int DEFAULT_LIGHT_INCREMENTAL_CONTENT_FILE_LIMIT = 100;
+    static const int DEFAULT_LIGHT_INCREMENTAL_OCR_FILE_LIMIT = 30;
+    static const int DEFAULT_LIGHT_INCREMENTAL_SIZE_LIMIT_MB = 200;
+    static const bool DEFAULT_MANUAL_RESUME_RESOURCE_CONTROL = true;
+    static const bool DEFAULT_MANUAL_IMMEDIATE_RESOURCE_CONTROL = false;
     // Default QStringLists need to be initialized in the .cpp or constructor
     // For simplicity here, we'll define them directly in loadAllConfigs logic
 };

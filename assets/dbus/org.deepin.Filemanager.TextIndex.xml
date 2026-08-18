@@ -55,5 +55,24 @@
       <arg name="movedFiles" type="a{ss}" direction="in"/>
       <annotation name="org.qtproject.QtDBus.QtTypeName.In0" value="QHash&lt;QString,QString&gt;"/>
     </method>
+    <method name="GetIndexStatus">
+      <arg type="s" direction="out"/>
+    </method>
+    <method name="ContinueUpdate">
+      <arg type="b" direction="out"/>
+    </method>
+    <method name="UpdateImmediately">
+      <arg type="b" direction="out"/>
+      <arg name="paths" type="as" direction="in"/>
+    </method>
+    <method name="RebuildIndex">
+      <arg type="b" direction="out"/>
+      <arg name="paths" type="as" direction="in"/>
+      <arg name="options" type="a{sv}" direction="in"/>
+      <annotation name="org.qtproject.QtDBus.QtTypeName.In1" value="QVariantMap"/>
+    </method>
+    <signal name="IndexStatusChanged">
+      <arg name="statusJson" type="s" direction="out"/>
+    </signal>
   </interface>
 </node>

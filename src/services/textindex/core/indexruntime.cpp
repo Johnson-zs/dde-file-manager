@@ -6,12 +6,14 @@
 
 SERVICETEXTINDEX_BEGIN_NAMESPACE
 
-IndexRuntime::IndexRuntime(IndexProfile profile, QObject *parent)
+IndexRuntime::IndexRuntime(IndexProfile profile, EnvDetector *envDetector, QObject *parent)
     : QObject(parent),
       m_profile(std::move(profile)),
       m_stateStore(m_profile),
       m_context(m_profile, &m_stateStore, selectExtractor(), selectDocumentBuilder()),
+      m_envDetector(envDetector),
       m_taskManager(new TaskManager(&m_context, this)),
+      m_scheduler(new TaskScheduler(m_taskManager, m_envDetector, &m_stateStore, m_profile, this)),
       m_fsEventController(new FSEventController(m_profile, this))
 {
 }
@@ -36,9 +38,19 @@ TaskManager *IndexRuntime::taskManager() const
     return m_taskManager;
 }
 
+TaskScheduler *IndexRuntime::scheduler() const
+{
+    return m_scheduler;
+}
+
 FSEventController *IndexRuntime::fsEventController() const
 {
     return m_fsEventController;
+}
+
+EnvDetector *IndexRuntime::envDetector() const
+{
+    return m_envDetector;
 }
 
 const IndexExtractor *IndexRuntime::selectExtractor() const

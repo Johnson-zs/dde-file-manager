@@ -53,6 +53,17 @@ public:
     bool silent() const;
     void setSilent(bool newSilent);
 
+    /// Whether CPU/resource control should be applied for this task.
+    /// When false (e.g. Manual immediate update) no CPU quota is set.
+    void setResourceControl(bool enabled) { m_resourceControl = enabled; }
+    bool resourceControl() const { return m_resourceControl; }
+
+    /// The systemd cgroup service name used for CPU quota set/reset.
+    /// Both Content and OCR runtimes share one process cgroup
+    /// (deepin-service-plugin@...TextIndex.service), so this is always the
+    /// TextIndex service name – see Defines::kCgroupServiceName.
+    void setServiceName(const QString &name) { m_serviceName = name; }
+
 Q_SIGNALS:
     void progressChanged(SERVICETEXTINDEX_NAMESPACE::IndexTask::Type type, qint64 count, qint64 total);
     void finished(SERVICETEXTINDEX_NAMESPACE::IndexTask::Type type, SERVICETEXTINDEX_NAMESPACE::HandlerResult result);
@@ -69,6 +80,8 @@ private:
     TaskHandler m_handler;
     bool m_indexCorrupted { false };
     bool m_silent { false };
+    bool m_resourceControl { true };
+    QString m_serviceName;
 };
 
 SERVICETEXTINDEX_END_NAMESPACE

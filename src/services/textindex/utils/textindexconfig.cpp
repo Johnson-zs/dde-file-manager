@@ -224,6 +224,33 @@ void TextIndexConfig::loadAllConfigs()
     if (m_diskBusyThresholdPercent < 1 || m_diskBusyThresholdPercent > 100)
         m_diskBusyThresholdPercent = DEFAULT_DISK_BUSY_THRESHOLD_PERCENT;
 
+    // --- Strategy optimization config keys (task grading thresholds) ---
+    m_lightIncrementalContentFileLimit = m_dconfigManager->value(
+            Defines::DConf::kTextIndexSchema, Defines::DConf::kLightIncrementalContentFileLimit,
+            DEFAULT_LIGHT_INCREMENTAL_CONTENT_FILE_LIMIT).toInt();
+    if (m_lightIncrementalContentFileLimit < 1 || m_lightIncrementalContentFileLimit > 100000)
+        m_lightIncrementalContentFileLimit = DEFAULT_LIGHT_INCREMENTAL_CONTENT_FILE_LIMIT;
+
+    m_lightIncrementalOcrFileLimit = m_dconfigManager->value(
+            Defines::DConf::kTextIndexSchema, Defines::DConf::kLightIncrementalOcrFileLimit,
+            DEFAULT_LIGHT_INCREMENTAL_OCR_FILE_LIMIT).toInt();
+    if (m_lightIncrementalOcrFileLimit < 1 || m_lightIncrementalOcrFileLimit > 100000)
+        m_lightIncrementalOcrFileLimit = DEFAULT_LIGHT_INCREMENTAL_OCR_FILE_LIMIT;
+
+    m_lightIncrementalSizeLimitMB = m_dconfigManager->value(
+            Defines::DConf::kTextIndexSchema, Defines::DConf::kLightIncrementalSizeLimitMB,
+            DEFAULT_LIGHT_INCREMENTAL_SIZE_LIMIT_MB).toInt();
+    if (m_lightIncrementalSizeLimitMB < 1 || m_lightIncrementalSizeLimitMB > 10240)
+        m_lightIncrementalSizeLimitMB = DEFAULT_LIGHT_INCREMENTAL_SIZE_LIMIT_MB;
+
+    m_manualResumeResourceControl = m_dconfigManager->value(
+            Defines::DConf::kTextIndexSchema, Defines::DConf::kManualResumeResourceControl,
+            DEFAULT_MANUAL_RESUME_RESOURCE_CONTROL).toBool();
+
+    m_manualImmediateResourceControl = m_dconfigManager->value(
+            Defines::DConf::kTextIndexSchema, Defines::DConf::kManualImmediateResourceControl,
+            DEFAULT_MANUAL_IMMEDIATE_RESOURCE_CONTROL).toBool();
+
     fmDebug() << "TextIndexConfig: Text index configurations loaded successfully";
     // You might want to print the loaded values here for debugging if needed
     // fmDebug() << "AutoIndexUpdateInterval:" << m_autoIndexUpdateInterval;
@@ -343,6 +370,36 @@ int TextIndexConfig::diskBusyThresholdPercent() const
 {
     QMutexLocker locker(&m_mutex);
     return m_diskBusyThresholdPercent;
+}
+
+int TextIndexConfig::lightIncrementalContentFileLimit() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_lightIncrementalContentFileLimit;
+}
+
+int TextIndexConfig::lightIncrementalOcrFileLimit() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_lightIncrementalOcrFileLimit;
+}
+
+int TextIndexConfig::lightIncrementalSizeLimitMB() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_lightIncrementalSizeLimitMB;
+}
+
+bool TextIndexConfig::manualResumeResourceControl() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_manualResumeResourceControl;
+}
+
+bool TextIndexConfig::manualImmediateResourceControl() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_manualImmediateResourceControl;
 }
 
 SERVICETEXTINDEX_END_NAMESPACE

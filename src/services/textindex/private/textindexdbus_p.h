@@ -27,10 +27,10 @@ class TextIndexDBusPrivate
     friend class ::TextIndexDBus;
 
 public:
-    explicit TextIndexDBusPrivate(TextIndexDBus *qq)
+    explicit TextIndexDBusPrivate(TextIndexDBus *qq, EnvDetector *envDetector = nullptr)
         : q(qq),
           adapter(new TextIndexAdaptor(qq)),
-          runtime(new IndexRuntime(IndexProfile::content(), qq))
+          runtime(new IndexRuntime(IndexProfile::content(), envDetector, qq))
     {
         initialize();
         initConnect();

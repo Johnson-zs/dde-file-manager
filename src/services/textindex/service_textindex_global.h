@@ -21,6 +21,11 @@ inline const QString kTextIndexServiceName =
         QLatin1String("deepin-service-plugin@org.deepin.Filemanager.TextIndex.service");
 inline const QString kOcrIndexServiceName =
         QLatin1String("deepin-service-plugin@org.deepin.Filemanager.OcrIndex.service");
+// The TextIndex and OcrIndex D-Bus objects are hosted by a single process
+// (deepin-service-plugin@...TextIndex.service), so the process-level cgroup
+// used for CPU/memory/IO control is always the TextIndex service unit. Both
+// runtimes target this name for systemd resource properties (design §2.1).
+inline const QString kCgroupServiceName = kTextIndexServiceName;
 inline const QString kAnythingDirType = QLatin1String("dir");
 inline const QString kAnythingDocType = QLatin1String("doc");
 inline const QString kAnythingPicType = QLatin1String("pic");
@@ -44,6 +49,13 @@ inline const QString kFolderExcludeFilters = QLatin1String("folderExcludeFilters
 inline const QString kCpuUsageLimitPercent = QLatin1String("cpuUsageLimitPercent");
 inline const QString kInotifyWatchesCoefficient = QLatin1String("inotifyWatchesCoefficient");
 inline const QString kBatchCommitInterval = QLatin1String("batchCommitInterval");
+
+// Strategy optimization – task grading thresholds & manual resource control
+inline const QString kLightIncrementalContentFileLimit = QLatin1String("lightIncrementalContentFileLimit");
+inline const QString kLightIncrementalOcrFileLimit = QLatin1String("lightIncrementalOcrFileLimit");
+inline const QString kLightIncrementalSizeLimitMB = QLatin1String("lightIncrementalSizeLimitMB");
+inline const QString kManualResumeResourceControl = QLatin1String("manualResumeResourceControl");
+inline const QString kManualImmediateResourceControl = QLatin1String("manualImmediateResourceControl");
 
 // Strategy optimization – environment detection
 inline const QString kIdleThresholdSeconds = QLatin1String("idleThresholdSeconds");

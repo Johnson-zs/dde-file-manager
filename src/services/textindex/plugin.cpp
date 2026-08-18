@@ -4,14 +4,18 @@
 
 #include "textindexdbus.h"
 #include "ocrindexdbus.h"
+#include "env/envdetector.h"
+#include "profile/indexprofile.h"
 
 #include <dfm-base/utils/processprioritymanager.h>
+#include <dfm-search/dsearch_global.h>
 #include <QDBusConnection>
 
 SERVICETEXTINDEX_USE_NAMESPACE
 
 static TextIndexDBus *textIndexDBus = nullptr;
 static OcrIndexDBus *ocrIndexDBus = nullptr;
+static EnvDetector *envDetector = nullptr;
 
 // DEBUG:
 // 1. budild a debug so file and copy to isntall path
@@ -33,8 +37,15 @@ extern "C" int DSMRegister(const char *name, void *data)
         fmWarning() << "TextIndex plugin: failed to register OCR index DBus service:" << bus.lastError().message();
     }
 
-    textIndexDBus = new TextIndexDBus();
-    ocrIndexDBus = new OcrIndexDBus();
+    // Process-level environment detector shared by both Content and OCR
+    // runtimes (design §2.1: single process, dual IndexRuntime). The
+    // LoadMonitor tracks the data disk of the content index directory.
+    envDetector = new EnvDetector();
+    envDetector->setDataPath(DFMSEARCH::Global::contentIndexDirectory());
+    envDetector->start();
+
+    textIndexDBus = new TextIndexDBus(envDetector);
+    ocrIndexDBus = new OcrIndexDBus(envDetector);
     dfmbase::ProcessPriorityManager::lowerAllAvailablePriorities(true);
 
     return 0;
@@ -54,6 +65,12 @@ extern "C" int DSMUnRegister(const char *name, void *data)
         textIndexDBus->cleanup();
         textIndexDBus->deleteLater();
         textIndexDBus = nullptr;
+    }
+
+    if (envDetector) {
+        envDetector->stop();
+        envDetector->deleteLater();
+        envDetector = nullptr;
     }
 
     QDBusConnection bus = QDBusConnection::sessionBus();

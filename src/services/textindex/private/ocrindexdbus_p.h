@@ -18,10 +18,10 @@ class OcrIndexDBusPrivate
     friend class ::OcrIndexDBus;
 
 public:
-    explicit OcrIndexDBusPrivate(OcrIndexDBus *qq)
+    explicit OcrIndexDBusPrivate(OcrIndexDBus *qq, EnvDetector *envDetector = nullptr)
         : q(qq),
           adapter(new OcrIndexAdaptor(qq)),
-          runtime(new IndexRuntime(IndexProfile::ocr(), qq))
+          runtime(new IndexRuntime(IndexProfile::ocr(), envDetector, qq))
     {
         initialize();
         initConnect();

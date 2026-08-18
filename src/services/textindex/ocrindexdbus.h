@@ -15,6 +15,7 @@
 
 SERVICETEXTINDEX_BEGIN_NAMESPACE
 class OcrIndexDBusPrivate;
+class EnvDetector;
 SERVICETEXTINDEX_END_NAMESPACE
 
 class OcrIndexDBus : public QObject, public QDBusContext
@@ -23,7 +24,7 @@ class OcrIndexDBus : public QObject, public QDBusContext
     Q_CLASSINFO("D-Bus Interface", "org.deepin.Filemanager.OcrIndex")
 
 public:
-    explicit OcrIndexDBus(QObject *parent = nullptr);
+    explicit OcrIndexDBus(SERVICETEXTINDEX_NAMESPACE::EnvDetector *envDetector = nullptr, QObject *parent = nullptr);
     ~OcrIndexDBus();
 
     void cleanup();
@@ -40,10 +41,15 @@ public Q_SLOTS:
     QString GetLastUpdateTime();
     bool ProcessFileChanges(const QStringList &createdFiles, const QStringList &modifiedFiles, const QStringList &deletedFiles);
     bool ProcessFileMoves(const QHash<QString, QString> &movedFiles);
+    QString GetIndexStatus();
+    bool ContinueUpdate();
+    bool UpdateImmediately(const QStringList &paths);
+    bool RebuildIndex(const QStringList &paths, const QVariantMap &options = QVariantMap());
 
 Q_SIGNALS:
     void TaskFinished(const QString &type, const QString &path, bool success);
     void TaskProgressChanged(const QString &type, const QString &path, qint64 count, qint64 total);
+    void IndexStatusChanged(const QString &statusJson);
 
 private:
     QScopedPointer<SERVICETEXTINDEX_NAMESPACE::OcrIndexDBusPrivate> d;

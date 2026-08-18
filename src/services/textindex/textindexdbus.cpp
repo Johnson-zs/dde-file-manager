@@ -34,20 +34,21 @@ void TextIndexDBusPrivate::initialize()
 
 void TextIndexDBusPrivate::initConnect()
 {
-    QObject::connect(runtime->taskManager(), &TaskManager::taskFinished,
+    // Task lifecycle & status notifications come from the scheduler, which
+    // centralises CPU-quota reset (process-level cgroup, design R8) and
+    // pause/resume bookkeeping.
+    QObject::connect(runtime->scheduler(), &TaskScheduler::taskFinished,
                      q, [this](const QString &type, const QString &path, bool success) {
-                         QString msg;
-                         fmDebug() << "TextIndexDBus: Resetting CPU limit after task completion";
-                         if (!SystemdCpuUtils::resetCpuQuota(Defines::kTextIndexServiceName, &msg)) {
-                             fmWarning() << "TextIndexDBus: Failed to reset CPU quota:" << msg;
-                         }
                          emit q->TaskFinished(type, path, success);
                      });
 
-    QObject::connect(runtime->taskManager(), &TaskManager::taskProgressChanged,
+    QObject::connect(runtime->scheduler(), &TaskScheduler::taskProgressChanged,
                      q, [this](const QString &type, const QString &path, qint64 count, qint64 total) {
                          emit q->TaskProgressChanged(type, path, count, total);
                      });
+
+    QObject::connect(runtime->scheduler(), &TaskScheduler::statusChanged,
+                     q, &TextIndexDBus::IndexStatusChanged);
 
     QObject::connect(runtime->fsEventController(), &FSEventController::requestProcessFileChanges,
                      q, &TextIndexDBus::ProcessFileChanges);
@@ -95,14 +96,13 @@ void TextIndexDBusPrivate::handleSlientStart()
     // NOTE: Used only for silent updates after the service is started for the first time!
     static std::once_flag flag;
     std::call_once(flag, [this]() {
-        // Create or update indexes silently
         const auto &configuredDirs = DFMSEARCH::Global::defaultIndexedDirectory();
         QStringList pathsToProcess;
 
         if (configuredDirs.isEmpty()) {
             pathsToProcess.append(QDir::homePath());
         } else {
-            pathsToProcess = configuredDirs;   // Assuming configuredDirs is a QStringList or compatible
+            pathsToProcess = configuredDirs;
         }
 
         if (!canSilentlyRefreshIndex(pathsToProcess.first())) {
@@ -110,34 +110,15 @@ void TextIndexDBusPrivate::handleSlientStart()
             return;
         }
 
-        // 1. 首先检查索引数据库是否存在
-        if (!q->IndexDatabaseExists()) {
-            fmInfo() << "TextIndexDBus: Index database does not exist, starting create task for:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Create, pathsToProcess, true);
-            return;
+        // Boot / crash recovery is graded and gated by the scheduler (design §6.5):
+        //   !dbExists          → Create(Heavy)
+        //   needsRebuild        → Update(Heavy)
+        //   createInProgress    → Update(Heavy)
+        //   dirty               → Update(Light) compare
+        //   clean               → skip
+        if (!runtime->scheduler()->submitBootRecovery(pathsToProcess)) {
+            fmInfo() << "TextIndexDBus: Clean state and no config changes, skipping global update";
         }
-
-        // 2. 检查是否需要更新
-        // Use recoveryPending flag which was set at startup if Dirty state was detected
-        const bool needsRecovery = runtime->taskManager()->isRecoveryPending();
-        const bool needsRebuild = runtime->stateStore().needsRebuild();
-
-        // 如果配置变化，立即清除标记（因为即将开始更新）
-        if (needsRebuild) {
-            fmInfo() << "TextIndexDBus: Config changed, clearing needsRebuild flag";
-            runtime->stateStore().setNeedsRebuild(false);
-        }
-
-        // 只要任一条件为真，就启动 Update
-        if (needsRebuild || needsRecovery) {
-            fmInfo() << "TextIndexDBus: Starting update task - needsRebuild:" << needsRebuild
-                     << "needsRecovery:" << needsRecovery << "for:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Update, pathsToProcess, true);
-            return;
-        }
-
-        // 3. Clean 状态且无需重建，跳过更新
-        fmInfo() << "TextIndexDBus: Clean state and no config changes, skipping global update";
     });
 }
 
@@ -157,8 +138,8 @@ bool TextIndexDBusPrivate::canSilentlyRefreshIndex(const QString &path) const
     return true;
 }
 
-TextIndexDBus::TextIndexDBus(QObject *parent)
-    : QObject(parent), QDBusContext(), d(new TextIndexDBusPrivate(this))
+TextIndexDBus::TextIndexDBus(EnvDetector *envDetector, QObject *parent)
+    : QObject(parent), QDBusContext(), d(new TextIndexDBusPrivate(this, envDetector))
 {
     QDBusConnection::RegisterOptions opts =
             QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals | QDBusConnection::ExportAllProperties;
@@ -202,14 +183,12 @@ void TextIndexDBus::SetEnabled(bool enabled)
 
 bool TextIndexDBus::CreateIndexTask(const QStringList &paths, const QVariantMap &options)
 {
-    bool silent = options.value("silent", false).toBool();
-    return d->runtime->taskManager()->startTask(IndexTask::Type::Create, paths, silent);
+    return d->runtime->scheduler()->submit(IndexTask::Type::Create, paths, options);
 }
 
 bool TextIndexDBus::UpdateIndexTask(const QStringList &paths, const QVariantMap &options)
 {
-    bool silent = options.value("silent", false).toBool();
-    return d->runtime->taskManager()->startTask(IndexTask::Type::Update, paths, silent);
+    return d->runtime->scheduler()->submit(IndexTask::Type::Update, paths, options);
 }
 
 bool TextIndexDBus::StopCurrentTask()
@@ -255,31 +234,32 @@ QString TextIndexDBus::GetLastUpdateTime()
     return d->runtime->stateStore().getLastUpdateTime();
 }
 
+QString TextIndexDBus::GetIndexStatus()
+{
+    return d->runtime->scheduler()->statusJson();
+}
+
+bool TextIndexDBus::ContinueUpdate()
+{
+    return d->runtime->scheduler()->continueUpdate();
+}
+
+bool TextIndexDBus::UpdateImmediately(const QStringList &paths)
+{
+    return d->runtime->scheduler()->updateImmediately(paths);
+}
+
+bool TextIndexDBus::RebuildIndex(const QStringList &paths, const QVariantMap &options)
+{
+    return d->runtime->scheduler()->rebuildIndex(paths, options);
+}
+
 bool TextIndexDBus::ProcessFileChanges(const QStringList &createdFiles,
                                        const QStringList &modifiedFiles,
                                        const QStringList &deletedFiles)
 {
-    bool tasksQueued = false;
-
-    // 处理删除的文件（优先处理，因为这些文件可能已经不存在）
-    if (!deletedFiles.isEmpty()) {
-        fmInfo() << "TextIndexDBus: Processing" << deletedFiles.size() << "deleted files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::RemoveFileList, deletedFiles, true) || tasksQueued;
-    }
-
-    // 处理新增的文件
-    if (!createdFiles.isEmpty()) {
-        fmInfo() << "TextIndexDBus: Processing" << createdFiles.size() << "created files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::CreateFileList, createdFiles, true) || tasksQueued;
-    }
-
-    // 处理修改的文件
-    if (!modifiedFiles.isEmpty()) {
-        fmInfo() << "TextIndexDBus: Processing" << modifiedFiles.size() << "modified files";
-        tasksQueued = d->runtime->taskManager()->startFileListTask(IndexTask::Type::UpdateFileList, modifiedFiles, true) || tasksQueued;
-    }
-
-    return tasksQueued;
+    return d->runtime->scheduler()->submitIncrementalBatch(createdFiles, modifiedFiles,
+                                                           deletedFiles, {});
 }
 
 bool TextIndexDBus::ProcessFileMoves(const QHash<QString, QString> &movedFiles)
@@ -290,11 +270,7 @@ bool TextIndexDBus::ProcessFileMoves(const QHash<QString, QString> &movedFiles)
     }
 
     fmInfo() << "TextIndexDBus: Processing" << movedFiles.size() << "moved files";
-
-    // 启动文件移动任务
-    bool taskQueued = d->runtime->taskManager()->startFileMoveTask(movedFiles, true);
-
-    return taskQueued;
+    return d->runtime->scheduler()->submitIncrementalBatch({}, {}, {}, movedFiles);
 }
 
 void TextIndexDBusPrivate::initializeSupportedExtensions()
@@ -333,7 +309,7 @@ void TextIndexDBusPrivate::handleConfigChanged()
         // Only start update task if index database exists
         if (q->IndexDatabaseExists()) {
             fmInfo() << "TextIndexDBus: Starting index update task due to supported file extensions change for paths:" << pathsToProcess;
-            runtime->taskManager()->startTask(IndexTask::Type::Update, pathsToProcess);
+            runtime->scheduler()->submit(IndexTask::Type::Update, pathsToProcess);
         } else {
             fmWarning() << "TextIndexDBus: Cannot start index update task, index database does not exist";
         }

@@ -287,6 +287,61 @@
 			"description": "Maximum 60-second average busyness percentage of the data disk for the system to be considered idle, ranging from 1 to 100.",
 			"permissions": "readwrite",
 			"visibility": "private"
+		},
+		"lightIncrementalContentFileLimit": {
+			"value": 100,
+			"serial": 0,
+			"flags": [],
+			"name": "Light incremental content file limit",
+			"name[zh_CN]": "全文轻量增量文件数上限",
+			"description[zh_CN]": "3 秒去重后需解析文件数小于等于此值且总大小不超限时，全文增量任务判为轻量（Light），否则为中量（Medium）。",
+			"description": "When the number of parseable files (after 3s de-duplication) is at or below this limit and the total size is within the size limit, a content incremental task is graded Light; otherwise Medium.",
+			"permissions": "readwrite",
+			"visibility": "private"
+		},
+		"lightIncrementalOcrFileLimit": {
+			"value": 30,
+			"serial": 0,
+			"flags": [],
+			"name": "Light incremental OCR file limit",
+			"name[zh_CN]": "OCR 轻量增量文件数上限",
+			"description[zh_CN]": "3 秒去重后需解析图片数小于等于此值且总大小不超限时，OCR 增量任务判为轻量（Light），否则为中量（Medium）。",
+			"description": "When the number of parseable images (after 3s de-duplication) is at or below this limit and the total size is within the size limit, an OCR incremental task is graded Light; otherwise Medium.",
+			"permissions": "readwrite",
+			"visibility": "private"
+		},
+		"lightIncrementalSizeLimitMB": {
+			"value": 200,
+			"serial": 0,
+			"flags": [],
+			"name": "Light incremental size limit (MB)",
+			"name[zh_CN]": "轻量增量总大小上限（MB）",
+			"description[zh_CN]": "3 秒去重后需解析文件总大小小于等于此值时判为轻量，否则升级为中量。与文件数上限同时生效，任一超限即升级。",
+			"description": "When the total size of parseable files (after 3s de-duplication) is at or below this limit the task is graded Light; otherwise it is upgraded to Medium. Applies together with the file-count limit; exceeding either upgrades the grade.",
+			"permissions": "readwrite",
+			"visibility": "private"
+		},
+		"manualResumeResourceControl": {
+			"value": true,
+			"serial": 0,
+			"flags": [],
+			"name": "Manual resume resource control",
+			"name[zh_CN]": "继续更新索引的资源管控",
+			"description[zh_CN]": "“继续更新索引”是否启用 CPU/IO 资源管控。默认开启；关闭后继续更新将不限速。",
+			"description": "Whether resource control (CPU/IO) is enabled for the manual 'Continue Update' action. Defaults to true; when false, continuing an update runs without rate limiting.",
+			"permissions": "readwrite",
+			"visibility": "private"
+		},
+		"manualImmediateResourceControl": {
+			"value": false,
+			"serial": 0,
+			"flags": [],
+			"name": "Manual immediate resource control",
+			"name[zh_CN]": "立即更新索引的资源管控",
+			"description[zh_CN]": "“立即更新索引/重新更新”是否启用 CPU/IO 资源管控。默认关闭（全绕过、不限速）。",
+			"description": "Whether resource control (CPU/IO) is enabled for the manual 'Update Immediately' action. Defaults to false (full bypass, no rate limiting).",
+			"permissions": "readwrite",
+			"visibility": "private"
 		}
 	}
 }
