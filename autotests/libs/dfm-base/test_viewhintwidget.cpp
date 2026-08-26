@@ -87,7 +87,6 @@ TEST(ViewHintWidgetTest, SetCustomWidgetNull)
     auto *child = new QWidget();
     w.setCustomWidget(child);
     w.setCustomWidget(nullptr);
-    // After setting null, old widget should be removed
     EXPECT_EQ(w.customWidget(), nullptr);
 }
 
@@ -96,4 +95,51 @@ TEST(ViewHintWidgetTest, SetEmptyMessage)
     ViewHintWidget w;
     w.setMessage("");
     SUCCEED();
+}
+
+TEST(ViewHintWidgetTest, SetLeftCustomWidgetAndRetrieve)
+{
+    ViewHintWidget w;
+    auto *leftWidget = new QWidget();
+    w.setCustomWidget(leftWidget, ViewHintWidget::Side::Left);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Left), leftWidget);
+}
+
+TEST(ViewHintWidgetTest, ReplaceLeftCustomWidgetDoesNotCrash)
+{
+    ViewHintWidget w;
+    auto *first = new QWidget();
+    w.setCustomWidget(first, ViewHintWidget::Side::Left);
+    auto *second = new QWidget();
+    w.setCustomWidget(second, ViewHintWidget::Side::Left);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Left), second);
+}
+
+TEST(ViewHintWidgetTest, SetLeftCustomWidgetNull)
+{
+    ViewHintWidget w;
+    auto *leftWidget = new QWidget();
+    w.setCustomWidget(leftWidget, ViewHintWidget::Side::Left);
+    w.setCustomWidget(nullptr, ViewHintWidget::Side::Left);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Left), nullptr);
+}
+
+TEST(ViewHintWidgetTest, SetIconAndLeftCustomWidgetCoexist)
+{
+    ViewHintWidget w;
+    w.setIcon("dialog-warning");
+    auto *leftWidget = new QWidget();
+    w.setCustomWidget(leftWidget, ViewHintWidget::Side::Left);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Left), leftWidget);
+}
+
+TEST(ViewHintWidgetTest, LeftAndRightCustomWidgetCoexist)
+{
+    ViewHintWidget w;
+    auto *left = new QWidget();
+    auto *right = new QWidget();
+    w.setCustomWidget(left, ViewHintWidget::Side::Left);
+    w.setCustomWidget(right, ViewHintWidget::Side::Right);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Left), left);
+    EXPECT_EQ(w.customWidget(ViewHintWidget::Side::Right), right);
 }

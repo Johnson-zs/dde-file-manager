@@ -111,3 +111,135 @@ TEST(ViewHintMessageTest, ShowTwiceSecondIgnored)
     // Second show should be ignored (message already exists)
     EXPECT_NO_FATAL_FAILURE({ msg.show(&host); });
 }
+
+// ============================================================
+// Live-update and left/right custom widget factory coverage
+// ============================================================
+
+TEST(ViewHintMessageTest, SetIconAfterShowUpdatesLiveWidget)
+{
+    ViewHintMessage msg;
+    msg.setText("initial");
+    msg.setIcon("dialog-warning");
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({ msg.setIcon("dialog-information"); });
+}
+
+TEST(ViewHintMessageTest, SetTextAfterShowUpdatesLiveWidget)
+{
+    ViewHintMessage msg;
+    msg.setText("initial");
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({ msg.setText("updated"); });
+}
+
+TEST(ViewHintMessageTest, SetActionsAfterShowUpdatesLiveWidget)
+{
+    ViewHintMessage msg;
+    msg.setText("test");
+    QWidget host;
+    msg.show(&host);
+    QList<QPair<QString, QString>> actions;
+    actions << QPair<QString, QString>("ok", "OK");
+    EXPECT_NO_FATAL_FAILURE({ msg.setActions(actions); });
+}
+
+TEST(ViewHintMessageTest, SetLeftCustomWidgetFactoryBeforeShow)
+{
+    ViewHintMessage msg;
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Left);
+    msg.setText("factory test");
+    QWidget host;
+    EXPECT_NO_FATAL_FAILURE({ msg.show(&host); });
+}
+
+TEST(ViewHintMessageTest, SetLeftCustomWidgetFactoryAfterShow)
+{
+    ViewHintMessage msg;
+    msg.setText("factory live test");
+    QWidget host;
+    msg.show(&host);
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Left);
+    EXPECT_NO_FATAL_FAILURE({});
+}
+
+TEST(ViewHintMessageTest, SetLeftCustomWidgetFactoryNullAfterShow)
+{
+    ViewHintMessage msg;
+    msg.setText("factory null test");
+    msg.setIcon("dialog-warning");
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({ msg.setCustomWidgetFactory(nullptr, ViewHintMessage::Side::Left); });
+}
+
+TEST(ViewHintMessageTest, SetRightCustomWidgetFactoryBeforeShow)
+{
+    ViewHintMessage msg;
+    msg.setText("right factory test");
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Right);
+    QWidget host;
+    EXPECT_NO_FATAL_FAILURE({ msg.show(&host); });
+}
+
+TEST(ViewHintMessageTest, SetRightCustomWidgetFactoryAfterShow)
+{
+    ViewHintMessage msg;
+    msg.setText("right factory live test");
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({
+        msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+            return new QWidget(parent);
+        }, ViewHintMessage::Side::Right);
+    });
+}
+
+TEST(ViewHintMessageTest, SetRightCustomWidgetFactoryNullAfterShow)
+{
+    ViewHintMessage msg;
+    msg.setText("right factory null test");
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Right);
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({ msg.setCustomWidgetFactory(nullptr, ViewHintMessage::Side::Right); });
+}
+
+TEST(ViewHintMessageTest, LeftAndRightCustomWidgetFactoryTogether)
+{
+    ViewHintMessage msg;
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Left);
+    msg.setCustomWidgetFactory([](QWidget *parent) -> QWidget * {
+        return new QWidget(parent);
+    }, ViewHintMessage::Side::Right);
+    msg.setText("both test");
+    QWidget host;
+    EXPECT_NO_FATAL_FAILURE({ msg.show(&host); });
+}
+
+TEST(ViewHintMessageTest, RefreshWithoutShowDoesNotCrash)
+{
+    ViewHintMessage msg;
+    EXPECT_NO_FATAL_FAILURE({ msg.refresh(); });
+}
+
+TEST(ViewHintMessageTest, RefreshAfterShowDoesNotCrash)
+{
+    ViewHintMessage msg;
+    msg.setText("refresh test");
+    QWidget host;
+    msg.show(&host);
+    EXPECT_NO_FATAL_FAILURE({ msg.refresh(); });
+}

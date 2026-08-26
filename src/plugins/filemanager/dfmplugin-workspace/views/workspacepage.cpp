@@ -29,6 +29,13 @@ WorkspacePage::WorkspacePage(QWidget *parent)
     : QWidget(parent)
 {
     initUI();
+
+    connect(WorkspaceHelper::instance(), &WorkspaceHelper::viewHintShowRequested,
+            this, &WorkspacePage::handleViewHintShow);
+    connect(WorkspaceHelper::instance(), &WorkspaceHelper::viewHintCloseRequested,
+            this, &WorkspacePage::handleViewHintClose);
+    connect(WorkspaceHelper::instance(), &WorkspaceHelper::viewHintUpdateRequested,
+            this, &WorkspacePage::handleViewHintUpdate);
 }
 
 WorkspacePage::~WorkspacePage()
@@ -358,7 +365,7 @@ void WorkspacePage::setCurrentView(const QUrl &url)
     }
 }
 
-void WorkspacePage::tryShowViewHint(const QUrl &url)
+void WorkspacePage::tryShowViewHint(const QUrl &url, const QVariantMap &content)
 {
     if (currentHint) {
         currentHint->close();   // -> msg WA_DeleteOnClose-deleted -> controller self-deletes
@@ -366,24 +373,142 @@ void WorkspacePage::tryShowViewHint(const QUrl &url)
     }
 
     const ViewHintSpec spec = WorkspaceHelper::instance()->findViewHint(url.scheme());
-    if (!spec.shouldShow)
-        return;
-    QString text;
-    if (!spec.shouldShow(url, &text))
+    if (!spec.shouldShow && content.isEmpty())
         return;
 
+    QString text;
+    if (content.isEmpty()) {
+        if (!spec.shouldShow)
+            return;
+        if (!spec.shouldShow(url, &text))
+            return;
+    } else {
+        text = content.value(ViewHintUpdateKey::kText, text).toString();
+    }
+
     auto *hint = new ViewHintMessage(this);
-    hint->setIcon(spec.icon);
-    hint->setText(text);
-    hint->setActions(spec.actions);
+    applyContentToHint(hint, content.isEmpty() ? QVariantMap {} : content, spec);
+    if (content.isEmpty()) {
+        hint->setIcon(spec.icon);
+        hint->setText(text);
+        hint->setActions(spec.actions);
+    }
     hint->setAutoDismissOnAction(true);
+    connectHintAction(hint, spec);
+    hint->show(this);
+    currentHint = hint;
+}
+
+void WorkspacePage::handleViewHintShow(const QString &scheme, const QVariantMap &content)
+{
+    if (currentViewScheme != scheme)
+        return;
+
+    if (currentHint) {
+        currentHint->close();
+        currentHint = nullptr;
+    }
+
+    const ViewHintSpec spec = WorkspaceHelper::instance()->findViewHint(scheme);
+
+    if (content.isEmpty()) {
+        if (!spec.shouldShow)
+            return;
+        QString text;
+        if (!spec.shouldShow(currentPageUrl, &text))
+            return;
+        auto *hint = new ViewHintMessage(this);
+        hint->setIcon(spec.icon);
+        hint->setText(text);
+        hint->setActions(spec.actions);
+        if (spec.leftCustomWidgetFactory)
+            hint->setCustomWidgetFactory(spec.leftCustomWidgetFactory, ViewHintMessage::Side::Left);
+        if (spec.rightCustomWidgetFactory)
+            hint->setCustomWidgetFactory(spec.rightCustomWidgetFactory, ViewHintMessage::Side::Right);
+        hint->setAutoDismissOnAction(true);
+        connectHintAction(hint, spec);
+        hint->show(this);
+        currentHint = hint;
+    } else {
+        auto *hint = new ViewHintMessage(this);
+        applyContentToHint(hint, content, spec);
+        hint->setAutoDismissOnAction(true);
+        connectHintAction(hint, spec);
+        hint->show(this);
+        currentHint = hint;
+    }
+}
+
+void WorkspacePage::handleViewHintClose(const QString &scheme)
+{
+    if (currentViewScheme != scheme)
+        return;
+
+    if (currentHint) {
+        currentHint->close();
+        currentHint = nullptr;
+    }
+}
+
+void WorkspacePage::handleViewHintUpdate(const QString &scheme, const QVariantMap &updates)
+{
+    if (currentViewScheme != scheme)
+        return;
+    if (!currentHint)
+        return;
+
+    applyContentToHint(currentHint, updates, WorkspaceHelper::instance()->findViewHint(scheme));
+}
+
+void WorkspacePage::applyContentToHint(ViewHintMessage *hint, const QVariantMap &content, const ViewHintSpec &spec)
+{
+    if (content.contains(ViewHintUpdateKey::kIcon))
+        hint->setIcon(content.value(ViewHintUpdateKey::kIcon).toString());
+    else if (!spec.icon.isEmpty())
+        hint->setIcon(spec.icon);
+
+    if (content.contains(ViewHintUpdateKey::kText))
+        hint->setText(content.value(ViewHintUpdateKey::kText).toString());
+
+    if (content.contains(ViewHintUpdateKey::kActions)) {
+        QList<QPair<QString, QString>> actions;
+        const QVariantList actionList = content.value(ViewHintUpdateKey::kActions).toList();
+        for (const QVariant &v : actionList) {
+            const QVariantMap m = v.toMap();
+            actions.append({ m.value("id").toString(), m.value("label").toString() });
+        }
+        hint->setActions(actions);
+    } else if (!content.isEmpty()) {
+        hint->setActions(spec.actions);
+    }
+
+    if (content.contains(ViewHintUpdateKey::kLeftCustomWidgetFactory)) {
+        auto factory = DPF_NAMESPACE::paramGenerator<ViewHintCustomWidgetFactory>(
+                content.value(ViewHintUpdateKey::kLeftCustomWidgetFactory));
+        hint->setCustomWidgetFactory(factory, ViewHintMessage::Side::Left);
+    } else if (spec.leftCustomWidgetFactory) {
+        hint->setCustomWidgetFactory(spec.leftCustomWidgetFactory, ViewHintMessage::Side::Left);
+    }
+
+    if (content.contains(ViewHintUpdateKey::kRightCustomWidgetFactory)) {
+        auto factory = DPF_NAMESPACE::paramGenerator<ViewHintCustomWidgetFactory>(
+                content.value(ViewHintUpdateKey::kRightCustomWidgetFactory));
+        hint->setCustomWidgetFactory(factory, ViewHintMessage::Side::Right);
+    } else if (spec.rightCustomWidgetFactory && !content.contains(ViewHintUpdateKey::kActions)) {
+        hint->setCustomWidgetFactory(spec.rightCustomWidgetFactory, ViewHintMessage::Side::Right);
+    }
+}
+
+void WorkspacePage::connectHintAction(ViewHintMessage *hint, const ViewHintSpec &spec)
+{
     connect(hint, &ViewHintMessage::actionTriggered, this, [this, spec](const QString &id) {
         if (spec.onAction)
             spec.onAction(id);
-        currentHint = nullptr;   // controller self-deletes via the message's destroyed signal
+        currentHint = nullptr;
     });
-    hint->show(this);
-    currentHint = hint;
+    connect(hint, &ViewHintMessage::closed, this, [this]() {
+        currentHint = nullptr;
+    });
 }
 
 void WorkspacePage::playDisappearAnimation(ViewPtr view)
