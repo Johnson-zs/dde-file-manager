@@ -123,6 +123,7 @@ private:
     static void processRegularFile(ScanState &state, const QByteArray &path, const struct stat &statBuf);
     static void processSymlink(ScanState &state, const QByteArray &path);
     static bool isDirectoryPath(const QByteArray &path, const struct stat &lstatBuf);
+    static void collectFileIfEnabled(ScanState &state, const QByteArray &path, bool isSourcePath);
     static void collectFileIfEnabled(ScanState &state, const QUrl &url, bool isSourcePath);
     static void emitProgress(ScanState &state, bool force = false);
     static bool isInodeProcessed(const ScanState &state, quint64 device, quint64 inode);
@@ -407,7 +408,7 @@ void FileScannerCore::scanLocalPathsImpl(ScanState &state, const QList<QUrl> &ur
                 ctx.isSourcePath = true;
                 dirStack.push(ctx);
                 // 收集源目录URL（如果启用 CollectFiles 选项）
-                collectFileIfEnabled(state, url, true);
+                collectFileIfEnabled(state, path, true);
             } else {
                 // 非目录：直接收集（普通文件、符号链接等）
                 if (state.options & FileScanner::ScanOption::CountOnly) {
@@ -420,7 +421,7 @@ void FileScannerCore::scanLocalPathsImpl(ScanState &state, const QList<QUrl> &ur
                     state.result.fileCount++;
                 }
                 // 收集源文件URL
-                collectFileIfEnabled(state, url, true);
+                collectFileIfEnabled(state, path, true);
             }
         } else {
             qCWarning(logDFMBase) << "FileScannerCore: lstat failed for source:" << path;
@@ -459,7 +460,6 @@ void FileScannerCore::scanLocalPathsImpl(ScanState &state, const QList<QUrl> &ur
             }
 
             const QByteArray entryPath = joinPath(dirPath, entry.name);
-            const QUrl entryUrl = QUrl::fromLocalFile(QString::fromUtf8(entryPath));
 
             if (countOnly) {
                 // CountOnly 模式：直接用 d_type 计数，无需 stat
@@ -482,7 +482,7 @@ void FileScannerCore::scanLocalPathsImpl(ScanState &state, const QList<QUrl> &ur
                     // 普通文件、符号链接、其他类型统一计数
                     state.result.fileCount++;
                 }
-                collectFileIfEnabled(state, entryUrl, false);
+                collectFileIfEnabled(state, entryPath, false);
                 emitProgress(state);
                 continue;
             }
@@ -537,7 +537,7 @@ void FileScannerCore::scanLocalPathsImpl(ScanState &state, const QList<QUrl> &ur
             }
 
             // 收集文件URL
-            collectFileIfEnabled(state, entryUrl, false);
+            collectFileIfEnabled(state, entryPath, false);
 
             // 定期发送进度
             emitProgress(state);
@@ -849,7 +849,7 @@ bool FileScannerCore::isDirectoryPath(const QByteArray &path, const struct stat 
     return false;
 }
 
-void FileScannerCore::collectFileIfEnabled(ScanState &state, const QUrl &url, bool isSourcePath)
+void FileScannerCore::collectFileIfEnabled(ScanState &state, const QByteArray &path, bool isSourcePath)
 {
     // 只有启用 CollectFiles 选项才收集
     if (!(state.options & FileScanner::ScanOption::CollectFiles)) {
@@ -857,6 +857,19 @@ void FileScannerCore::collectFileIfEnabled(ScanState &state, const QUrl &url, bo
     }
 
     // 如果是源路径且未设置 IncludeSource 选项，则不收集
+    if (isSourcePath && !(state.options & FileScanner::ScanOption::IncludeSource)) {
+        return;
+    }
+
+    state.result.allFiles.append(QUrl::fromLocalFile(QString::fromUtf8(path)));
+}
+
+void FileScannerCore::collectFileIfEnabled(ScanState &state, const QUrl &url, bool isSourcePath)
+{
+    if (!(state.options & FileScanner::ScanOption::CollectFiles)) {
+        return;
+    }
+
     if (isSourcePath && !(state.options & FileScanner::ScanOption::IncludeSource)) {
         return;
     }
@@ -933,7 +946,12 @@ void ScannerWorker::start()
         if (shouldStop()) {
             return false;   // 返回 false 表示停止扫描
         }
-        emit resultReady(result, false);
+        FileScanner::ScanResult progress;
+        progress.totalSize = result.totalSize;
+        progress.progressSize = result.progressSize;
+        progress.fileCount = result.fileCount;
+        progress.directoryCount = result.directoryCount;
+        emit resultReady(progress, false);
         return true;   // 继续扫描
     };
 
