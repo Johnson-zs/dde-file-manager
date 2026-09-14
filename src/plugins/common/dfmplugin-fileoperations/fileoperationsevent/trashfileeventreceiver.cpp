@@ -18,6 +18,7 @@
 #include <dfm-base/base/application/application.h>
 #include <dfm-base/utils/properties.h>
 #include <dfm-base/utils/systempathutil.h>
+#include <QSet>
 
 #include <dfm-io/dfmio_utils.h>
 
@@ -235,6 +236,7 @@ void TrashFileEventReceiver::countTrashFile(const quint64 windowId, const DFMBAS
     fmInfo() << "Starting trash file enumeration";
     DFMIO::DEnumerator enumerator(FileUtils::trashRootUrl());
     QList<QUrl> allFilesList;
+    QSet<QUrl> allFilesSet;
     int processedCount = 0;
 
     while (enumerator.hasNext()) {
@@ -243,7 +245,8 @@ void TrashFileEventReceiver::countTrashFile(const quint64 windowId, const DFMBAS
             return;
         }
         auto url = FileUtils::bindUrlTransform(enumerator.next());
-        if (!allFilesList.contains(url)) {
+        if (!allFilesSet.contains(url)) {
+            allFilesSet.insert(url);
             allFilesList.append(url);
             processedCount++;
         }

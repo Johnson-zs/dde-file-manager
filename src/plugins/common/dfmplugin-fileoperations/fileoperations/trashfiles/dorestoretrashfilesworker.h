@@ -14,6 +14,7 @@
 #include <dfm-io/dfile.h>
 
 #include <QObject>
+#include <QSet>
 
 class QStorageInfo;
 USING_IO_NAMESPACE
@@ -46,7 +47,7 @@ private:
 
 private:
     QAtomicInteger<qint64> completeFilesCount { 0 };   // move to trash success file count
-    QList<QUrl> handleSourceFiles;   // List of all handled files
+    QSet<QUrl> handleSourceFiles;   // Set of all handled files
 };
 DPFILEOPERATIONS_END_NAMESPACE
 

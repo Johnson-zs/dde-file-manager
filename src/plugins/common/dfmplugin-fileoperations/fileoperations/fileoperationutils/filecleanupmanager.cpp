@@ -14,7 +14,8 @@ void FileCleanupManager::trackIncompleteFile(const QUrl &url)
     if (!url.isValid())
         return;
 
-    if (!incompleteFiles.contains(url)) {
+    if (!incompleteFilesSet.contains(url)) {
+        incompleteFilesSet.insert(url);
         incompleteFiles.append(url);
         fmDebug() << "Track incomplete file:" << url.toLocalFile();
     }
@@ -22,7 +23,8 @@ void FileCleanupManager::trackIncompleteFile(const QUrl &url)
 
 void FileCleanupManager::confirmCompleted(const QUrl &url)
 {
-    if (incompleteFiles.removeAll(url) > 0) {
+    if (incompleteFilesSet.remove(url) > 0) {
+        incompleteFiles.removeAll(url);
         fmDebug() << "Confirm file completed:" << url.toLocalFile();
     }
 }

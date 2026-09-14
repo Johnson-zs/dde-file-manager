@@ -8,6 +8,7 @@
 #include "dfmplugin_fileoperations_global.h"
 #include <QUrl>
 #include <QList>
+#include <QSet>
 
 DPFILEOPERATIONS_BEGIN_NAMESPACE
 
@@ -51,10 +52,11 @@ public:
     /**
      * 清空列表
      */
-    void clear() { incompleteFiles.clear(); }
+    void clear() { incompleteFiles.clear(); incompleteFilesSet.clear(); }
 
 private:
     QList<QUrl> incompleteFiles;
+    QSet<QUrl> incompleteFilesSet;
 };
 
 DPFILEOPERATIONS_END_NAMESPACE

@@ -155,6 +155,8 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
         urlsSource = allFilesList;
 
     QMap<QUrl, QString> failUrls;
+    QSet<QUrl> seenCompleteSources;
+    QSet<QUrl> seenCompleteTargets;
     for (const auto &url : urlsSource) {
         if (!stateCheck())
             return false;
@@ -166,7 +168,7 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
         if (restoreInfo.isNull()) {
             fmDebug() << "Check restore info failed - url:" << url;
             completeFilesCount++;
-            handleSourceFiles.append(fileUrl);
+            handleSourceFiles.insert(fileUrl);
             continue;
         }
 
@@ -174,7 +176,7 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
         if (targetInfo.isNull()) {
             if (result) {
                 completeFilesCount++;
-                handleSourceFiles.append(fileUrl);
+                handleSourceFiles.insert(fileUrl);
                 continue;
             } else {
                 fmDebug() << "Create parent directory failed for restore - url:" << url;
@@ -195,7 +197,7 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
                                                      fileInfo->attribute(DFileInfo::AttributeID::kStandardFileName).toString(), &ok);
         if (newTargetInfo.isNull()) {
             fmDebug() << "File check failed for restore - from:" << url;
-            handleSourceFiles.append(fileUrl);
+            handleSourceFiles.insert(fileUrl);
             continue;
         }
 
@@ -203,12 +205,15 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
         bool trashSucc = fileHandler.moveFile(url, newTargetInfo->uri(), DFMIO::DFile::CopyFlag::kOverwrite);
         if (trashSucc) {
             completeFilesCount++;
-            if (!completeSourceFiles.contains(fileUrl)) {
+            if (!seenCompleteSources.contains(fileUrl)) {
+                seenCompleteSources.insert(fileUrl);
                 completeSourceFiles.append(fileUrl);
                 completeCustomInfos.append(trashInfoCache);
             }
-            if (!completeTargetFiles.contains(newTargetInfo->uri()))
+            if (!seenCompleteTargets.contains(newTargetInfo->uri())) {
+                seenCompleteTargets.insert(newTargetInfo->uri());
                 completeTargetFiles.append(newTargetInfo->uri());
+            }
             emit fileRenamed(fileUrl, newTargetInfo->uri());
         } else {
             auto errorCode = fileHandler.errorCode();
@@ -226,7 +231,7 @@ bool DoRestoreTrashFilesWorker::doRestoreTrashFiles()
             if (!trashSucc)
                 failUrls.insert(url, fileHandler.errorString());
         }
-        handleSourceFiles.append(fileUrl);
+        handleSourceFiles.insert(fileUrl);
     }
 
     if (failUrls.count() > 0) {

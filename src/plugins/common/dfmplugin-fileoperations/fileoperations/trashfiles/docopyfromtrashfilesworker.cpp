@@ -16,6 +16,7 @@
 #include <QMutex>
 #include <QSettings>
 #include <QStorageInfo>
+#include <QSet>
 
 DPFILEOPERATIONS_USE_NAMESPACE
 DoCopyFromTrashFilesWorker::DoCopyFromTrashFilesWorker(QObject *parent)
@@ -66,6 +67,8 @@ bool DoCopyFromTrashFilesWorker::initArgs()
 bool DoCopyFromTrashFilesWorker::doOperate()
 {
     bool result = false;
+    QSet<QUrl> seenCompleteSources;
+    QSet<QUrl> seenCompleteTargets;
 
     for (const auto &url : sourceUrls) {
         if (!stateCheck())
@@ -113,11 +116,14 @@ bool DoCopyFromTrashFilesWorker::doOperate()
         bool copySucc = this->copyFileFromTrash(url, newTargetInfo->uri(), DFMIO::DFile::CopyFlag::kOverwrite);
         if (copySucc) {
             completeFilesCount++;
-            if (!completeSourceFiles.contains(url)) {
+            if (!seenCompleteSources.contains(url)) {
+                seenCompleteSources.insert(url);
                 completeSourceFiles.append(url);
             }
-            if (!completeTargetFiles.contains(targetFileInfo->uri()))
+            if (!seenCompleteTargets.contains(targetFileInfo->uri())) {
+                seenCompleteTargets.insert(targetFileInfo->uri());
                 completeTargetFiles.append(targetFileInfo->uri());
+            }
             continue;
         }
         fmWarning() << "Failed to copy file from trash - from:" << url << "to:" << newTargetInfo->uri();

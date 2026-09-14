@@ -12,6 +12,7 @@
 
 #include <QUrl>
 #include <QDebug>
+#include <QSet>
 
 DFMBASE_USE_NAMESPACE
 DPFILEOPERATIONS_USE_NAMESPACE
@@ -54,10 +55,13 @@ bool DoCleanTrashFilesWorker::statisticsFilesSize()
         const QUrl &urlSource = sourceUrls[0];
         if (UniversalUtils::urlEquals(urlSource, FileUtils::trashRootUrl())) {
             DFMIO::DEnumerator enumerator(urlSource);
+            QSet<QUrl> allFilesSet;
             while (enumerator.hasNext()) {
                 auto url = FileUtils::bindUrlTransform(enumerator.next());
-                if (!allFilesList.contains(url))
+                if (!allFilesSet.contains(url)) {
+                    allFilesSet.insert(url);
                     allFilesList.append(url);
+                }
             }
         }
     }
