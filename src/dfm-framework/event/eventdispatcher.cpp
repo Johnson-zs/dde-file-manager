@@ -27,8 +27,10 @@ bool EventDispatcher::dispatch(const QVariantList &params)
         return true;
     }
 
+    QReadLocker locker(&lock);
     auto filtersCopy = filterList;
     auto handlersCopy = handlerList;
+    locker.unlock();
 
     if (std::any_of(filtersCopy.begin(), filtersCopy.end(), [params](const EventHandler<Listener> &h) {
             return h.handler && h.handler(params).toBool();

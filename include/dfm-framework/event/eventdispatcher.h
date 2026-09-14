@@ -49,6 +49,7 @@ public:
         static_assert(std::is_base_of<QObject, T>::value, "Template type T must be derived QObject");
         static_assert(!std::is_pointer<T>::value, "Receiver::bind's template type T must not be a pointer type");
 
+        QWriteLocker locker(&lock);
         auto func = [obj, method](const QVariantList &args) -> QVariant {
             EventHelper<decltype(method)> helper = (EventHelper<decltype(method)>(obj, method));
             return helper.invoke(args);
@@ -63,6 +64,7 @@ public:
         static_assert(std::is_base_of<QObject, T>::value, "Template type T must be derived QObject");
         static_assert(!std::is_pointer<T>::value, "Receiver::bind's template type T must not be a pointer type");
 
+        QWriteLocker locker(&lock);
         bool ret { true };
         for (auto handler : handlerList) {
             if (handler.compare(obj, method)) {
@@ -86,6 +88,7 @@ public:
 #elif __cplusplus > 201103L
         static_assert(std::is_same<bool, ReturnType<decltype(method)>>::value, "Template method's ReturnType must is bool");
 #endif
+        QWriteLocker locker(&lock);
         auto func = [obj, method](const QVariantList &args) -> bool {
             EventHelper<decltype(method)> helper = (EventHelper<decltype(method)>(obj, method));
             return helper.invoke(args).toBool();
@@ -103,6 +106,7 @@ public:
 #elif __cplusplus > 201103L
         static_assert(std::is_same<bool, ReturnType<decltype(method)>>::value, "Template method's ReturnType must is bool");
 #endif
+        QWriteLocker locker(&lock);
         bool ret { true };
         for (auto handler : filterList) {
             if (handler.compare(obj, method)) {
@@ -119,6 +123,7 @@ public:
 private:
     HandlerList handlerList {};
     FilterList filterList {};
+    QReadWriteLock lock;
 };
 
 class EventDispatcherManager
