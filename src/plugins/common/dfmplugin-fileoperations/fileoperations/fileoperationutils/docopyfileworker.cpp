@@ -391,6 +391,29 @@ DoCopyFileWorker::NextDo DoCopyFileWorker::doCopyFileWithDirectIO(const DFileInf
                 success = false;
                 break;
             }
+
+            if (written == 0) {
+                fmWarning() << "Write returned 0 bytes during O_DIRECT copy - file:" << destPath;
+
+                // Handle write error with UI dialog
+                auto jobError = mapSystemErrorToJobError(EIO, true);
+                AbstractJobHandler::SupportAction action = doHandleErrorAndWait(
+                        fromInfo->uri(), toInfo->uri(), jobError, true);
+
+                if (action == AbstractJobHandler::SupportAction::kRetryAction) {
+                    // Seek to retry writing this chunk
+                    if (lseek(writer.fd, copied + bytesWritten, SEEK_SET) < 0) {
+                        success = false;
+                        break;
+                    }
+                    continue;   // Retry the write
+                }
+
+                // For Skip or Cancel, set success to false and break
+                success = false;
+                break;
+            }
+
             bytesWritten += written;
         }
 
