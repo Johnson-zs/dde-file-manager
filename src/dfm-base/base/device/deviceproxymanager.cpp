@@ -23,7 +23,7 @@ DeviceProxyManager *DeviceProxyManager::instance()
     return &ins;
 }
 
-const OrgDeepinFilemanagerDaemonDeviceManagerInterface *DeviceProxyManager::getDBusIFace() const
+OrgDeepinFilemanagerDaemonDeviceManagerInterface *DeviceProxyManager::getDBusIFace() const
 {
     return d->devMngDBus.data();
 }
@@ -230,7 +230,7 @@ DeviceProxyManagerPrivate::~DeviceProxyManagerPrivate()
 
 bool DeviceProxyManagerPrivate::isDBusRuning()
 {
-    return QDBusConnection::sessionBus().interface()->isServiceRegistered(kDeviceService);
+    return dbusRunning.loadAcquire();
 }
 
 void DeviceProxyManagerPrivate::initConnection()
@@ -242,21 +242,25 @@ void DeviceProxyManagerPrivate::initConnection()
     q->connect(dbusWatcher.data(), &QDBusServiceWatcher::serviceRegistered, q, [this] {
         if (isShuttingDown.loadAcquire())
             return;
+        dbusRunning.storeRelease(true);
         connectToDBus();
         emit q->devMngDBusRegistered();
         qCInfo(logDFMBase) << "Device manager DBus service registered, switching to DBus connection";
     });
     q->connect(dbusWatcher.data(), &QDBusServiceWatcher::serviceUnregistered, q, [this] {
         if (isShuttingDown.loadAcquire()) {
+            dbusRunning.storeRelease(false);
             devMngDBus.reset();
             return;
         }
         devMngDBus.reset();
+        dbusRunning.storeRelease(false);
         connectToAPI();
         emit q->devMngDBusUnregistered();
         qCInfo(logDFMBase) << "Device manager DBus service unregistered, switching to direct API connection";
     });
 
+    dbusRunning.storeRelease(QDBusConnection::sessionBus().interface()->isServiceRegistered(kDeviceService));
     if (isDBusRuning()) {
         qCInfo(logDFMBase) << "Device manager DBus service is available, connecting to DBus";
         connectToDBus();

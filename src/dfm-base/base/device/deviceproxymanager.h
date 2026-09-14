@@ -30,7 +30,7 @@ class DeviceProxyManager : public QObject
 public:
     static DeviceProxyManager *instance();
 
-    const OrgDeepinFilemanagerDaemonDeviceManagerInterface *getDBusIFace() const;
+    OrgDeepinFilemanagerDaemonDeviceManagerInterface *getDBusIFace() const;
 
     // device info getter
     QStringList getAllBlockIds(GlobalServerDefines::DeviceQueryOptions opts = GlobalServerDefines::DeviceQueryOption::kNoCondition);

@@ -8,6 +8,14 @@
 #include <dfm-base/base/device/devicemanager.h>
 #include <dfm-base/base/device/deviceproxymanager.h>
 
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+#    include "devicemanager_interface.h"
+#else
+#    include "devicemanager_interface_qt6.h"
+#endif
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+
 #include <DSysInfo>
 #include <QDebug>
 #include <QCoreApplication>
@@ -110,16 +118,31 @@ void DiscDeviceScanner::scanOpticalDisc()
 {
     using namespace GlobalServerDefines;
     std::for_each(discDevIdGroup.cbegin(), discDevIdGroup.cend(), [this](const QString &id) {
-        const auto &info { DevProxyMng->queryBlockInfo(id) };
-        auto &&dev { info.value(DeviceProperty::kDevice).toString() };
-        bool optical { info.value(DeviceProperty::kOptical).toBool() };
-        if (!optical)
-            return;
-        if (!dev.startsWith("/dev/sr"))
-            return;
-        // QThreadPool takes ownership and deletes 'Scanner' automatically
-        Scanner *scanner = new Scanner(dev);
-        threadPool->start(scanner);
+        auto *iface = DevProxyMng->getDBusIFace();
+        if (iface && DevProxyMng->isDBusRuning()) {
+            auto *watcher = new QDBusPendingCallWatcher(iface->QueryBlockDeviceInfo(id, false), this);
+            connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *w) {
+                w->deleteLater();
+                QDBusPendingReply<QVariantMap> reply = *w;
+                if (reply.isError())
+                    return;
+                const auto &info = reply.value();
+                auto &&dev { info.value(DeviceProperty::kDevice).toString() };
+                bool optical { info.value(DeviceProperty::kOptical).toBool() };
+                if (!optical || !dev.startsWith("/dev/sr"))
+                    return;
+                Scanner *scanner = new Scanner(dev);
+                threadPool->start(scanner);
+            });
+        } else {
+            const auto &info { DevProxyMng->queryBlockInfo(id) };
+            auto &&dev { info.value(DeviceProperty::kDevice).toString() };
+            bool optical { info.value(DeviceProperty::kOptical).toBool() };
+            if (!optical || !dev.startsWith("/dev/sr"))
+                return;
+            Scanner *scanner = new Scanner(dev);
+            threadPool->start(scanner);
+        }
     });
 }
 

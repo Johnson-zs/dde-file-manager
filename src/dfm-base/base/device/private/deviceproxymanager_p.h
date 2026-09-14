@@ -60,6 +60,7 @@ private:
     QList<QMetaObject::Connection> connections;
     int currentConnectionType = kNoneConnection;   // 0 for API connection and 1 for DBus connection
     QAtomicInteger<bool> isShuttingDown { false };
+    QAtomicInteger<bool> dbusRunning { false };
     QReadWriteLock lock;
     QMap<QString, QStringList> externalMounts;
     QMap<QString, QStringList> allMounts;   // contain system disk
