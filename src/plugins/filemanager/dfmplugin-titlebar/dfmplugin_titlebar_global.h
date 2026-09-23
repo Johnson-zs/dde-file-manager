@@ -30,6 +30,7 @@ inline constexpr int kIconHeight { 14 };
 inline constexpr int kItemHeight { 30 };
 inline constexpr int kItemMargin { 8 };
 inline constexpr int kCompleterMaxHeight { 260 };
+inline constexpr int kMaxElidedWidth { 50 };
 inline constexpr int kToolButtonSize { 30 };
 inline constexpr int kToolButtonIconSize { 16 };
 inline constexpr int kMaxTabCount { 8 };

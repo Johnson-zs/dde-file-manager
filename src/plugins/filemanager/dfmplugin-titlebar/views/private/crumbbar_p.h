@@ -53,6 +53,9 @@ private:
 
     void appendWidget(QWidget *widget, int stretch = 0);
     void updateButtonVisibility();
+    int calculateAvailableWidth(const QMargins &margins) const;
+    void compressThreeButtons(QList<UrlPushButton *> &buttonsToShow,
+                              QList<CrumbData> &stackedDatas, const QMargins &margins);
 };
 }
 
